@@ -1,0 +1,9 @@
+
+line-length = 85
+
+[lint]
+extend-select = ["I"]
+
+[format]
+quote-style = "single"
+docstring-code-format = false

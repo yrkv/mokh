@@ -1,0 +1,27 @@
+[project]
+name = "mokh"
+version = "0.1.0"
+description = "A minimal configuration library"
+readme = "README.md"
+authors = [
+    { name = "Yegor Kuznetsov" }
+]
+requires-python = ">=3.12" # 3.12 for `type` statement (PEP 695)
+dependencies = [
+    "pyyaml>=6.0.3",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.3,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ipywidgets>=8.1.8",
+    "jupyter>=1.1.1",
+    "mypy>=1.20.1",
+    "pdoc>=16.0.0",
+    "pytest>=9.0.3",
+    "ruff>=0.15.11",
+    "tqdm>=4.67.3",
+]
