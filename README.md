@@ -60,7 +60,7 @@ ch_out: 16
 # can be achieved via args passed to `@mokh.configurable()`.
 train: 
     lr: 0.02
-    batch_size
+    batch_size: 4
 ```
 
 Then, we can (for example) run the following to load that configuration while
