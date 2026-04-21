@@ -47,7 +47,7 @@ from the command line.
 
 `main.py`:
 ```python
-with mokh.configure_from_args():
+with mokh.configure_cli():
     model = setup_model()
     train(model)
 ```
@@ -56,12 +56,11 @@ with mokh.configure_from_args():
 ```yaml
 ch_in: 16
 ch_h: 64
-ch_out: 16
 # By default, functions search their name as a prefix. More detailed control
 # can be achieved via args passed to `@mokh.configurable()`.
+setup_model.ch_out: 16
 train: 
     lr: 0.02
-    batch_size: 4
 ```
 
 Then, we can (for example) run the following to load that configuration while

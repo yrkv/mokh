@@ -1,4 +1,7 @@
-from mokh.configuration import GLOBAL_CONFIG, Value, configure
+import contextlib
+
+from mokh.configuration import GLOBAL_CONFIG, Value
+from mokh.configure import configure
 
 
 def test_basic():
@@ -22,6 +25,9 @@ def test_basic():
 
     c1 = configure(source1)
     c2 = configure(source2)
+
+    assert isinstance(c1, contextlib.AbstractContextManager)
+    assert isinstance(c2, contextlib.AbstractContextManager)
 
     assert GLOBAL_CONFIG._map == {}
 

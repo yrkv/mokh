@@ -5,7 +5,7 @@
 
 from . import common, configuration, dynamic
 from .configurable import configurable
-from .configuration import configure
+from .configure import configure, configure_cli, configure_file
 
 __all__ = [
     # Modules
@@ -13,6 +13,8 @@ __all__ = [
     'configuration',
     'dynamic',
     # Functions
-    'configure',
     'configurable',
+    'configure',
+    'configure_cli',
+    'configure_file',
 ]

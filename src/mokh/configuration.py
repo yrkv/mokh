@@ -1,4 +1,4 @@
-from collections.abc import Hashable
+from collections.abc import Hashable, Mapping
 from typing import NamedTuple
 
 import frozendict as cool
@@ -11,7 +11,9 @@ type FrozenConfigSource = (
 Immutable subtype of `ConfigSource`, including all nested objects.
 """
 
-type ConfigSource = list[ConfigSource] | dict[str, ConfigSource] | FrozenConfigSource
+type ConfigSource = (
+    list[ConfigSource] | Mapping[str, ConfigSource] | FrozenConfigSource
+)
 """
 Represents the source a configuration is defined from, or any subset of it. Any
 actual `Configuration` will contain (references to) subsets of the source as
@@ -44,10 +46,12 @@ type FrozenConfigurationDict = frozendict[str, frozendict[str, ConfigValue]]
 Immutable `ConfigurationDict`, making it hashable.
 """
 
+type ConfigurationMapping = Mapping[str, Mapping[str, ConfigValue]]
 
-def _freeze_configuration_dict(d: ConfigurationDict):
+
+def _freeze_configuration_dict(d: ConfigurationMapping):
     """
-    Convert a `ConfigurationDict` into a `FrozenConfigurationDict`
+    Convert any `ConfigurationMapping` into a `FrozenConfigurationDict`
     """
     return frozendict({prefix: frozendict(params) for prefix, params in d.items()})
 
@@ -66,7 +70,8 @@ class Configuration:
             return
 
         source = cool.deepfreeze(source)
-        self._map = _build_configuration_map(source)
+        cdict = _build_configuration_map(source)
+        self._map = _freeze_configuration_dict(cdict)
 
 
 GLOBAL_CONFIG: Configuration = Configuration({})
@@ -112,7 +117,7 @@ def _build_configuration_map(
     source: dict[str, ConfigSource],
     out: None | ConfigurationDict = None,
     prefix: str = '',
-) -> FrozenConfigurationDict:
+) -> ConfigurationDict:
     r"""Create a `Configuration` from a mapping, which is expected/intended to
     just be the content of a single config file.
 
@@ -163,12 +168,12 @@ def _build_configuration_map(
             next_prefix = f'{current_prefix}.{last}'.strip('.')
             _build_configuration_map(val, out, prefix=next_prefix)
 
-    return _freeze_configuration_dict(out)
+    return out
 
 
 def merge_configurations(
-    a: ConfigurationDict,
-    b: ConfigurationDict,
+    a: ConfigurationMapping,
+    b: ConfigurationMapping,
 ) -> ConfigurationDict:
     r"""Create a new `ConfigurationDict` which is equivalent to `a` with `b`
     overlaid on top, combining prefixes/parameter names and overriding values.
@@ -192,20 +197,6 @@ def merge_configurations(
     return out
 
 
-def configure(
-    source: dict[str, ConfigSource] = {},
-    **kwargs: ConfigSource,
-):
-    if len(source) >= 1 and len(kwargs) >= 1:
-        raise ValueError("Provide either 'source' or keyword arguments, not both")
-
-    if source == {}:
-        source = kwargs
-
-    config = Configuration(source)
-    return ConfigContextManager(config)
-
-
 class ConfigContextManager:
     """Context manager which applies changes to the current configuration, as
     well as reverting said changes upon end.
@@ -216,16 +207,16 @@ class ConfigContextManager:
 
     def __init__(
         self,
-        config: Configuration,
+        config_dict: ConfigurationMapping,
         target: Configuration = GLOBAL_CONFIG,
     ):
-        self.config = config
+        self.config_dict = config_dict
         self.target = target
 
     def __enter__(self):
         self.prev = self.target._map
         self.target._map = _freeze_configuration_dict(
-            merge_configurations(self.target._map, self.config._map)
+            merge_configurations(self.target._map, self.config_dict)
         )
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
