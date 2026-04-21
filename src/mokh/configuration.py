@@ -220,10 +220,9 @@ class ConfigContextManager:
 
     def __enter__(self):
         self.prev = self.target._map
-        self.target._map = merge_configurations(self.target._map, self.config._map)
-        # self.target._map = _freeze_configuration_dict(
-        #    merge_configurations(self.target._map, self.config._map)
-        # )
+        self.target._map = _freeze_configuration_dict(
+            merge_configurations(self.target._map, self.config._map)
+        )
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self.target._map = self.prev
