@@ -1,6 +1,6 @@
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
-from .common import Json
+from .common import ConfigSource
 
 type Configuration = dict[str, dict[str, ConfigValue]]
 """
@@ -15,6 +15,8 @@ type Configuration = dict[str, dict[str, ConfigValue]]
 - `value`
     - See each variant's docstring for meanings.
     - `ConfigValue` = `Value` | `ValueConflict` | `ValueMissing`
+
+Expected to NOT be modified after creation. Should be considered immutable.
 """
 type ConfigValue = Value | ValueConflict | ValueMissing
 
@@ -32,11 +34,11 @@ See `Configuration` type alias for more details.
 
 class Value(NamedTuple):
     """
-    Contains anything, expected/assumed to contain a `Json`. Deep copied into
-    corresponding arguments when invoking configurable functions.
+    Contains anything, expected/assumed to contain a `ConfigSource`. Deep
+    copied into corresponding arguments when invoking configurable functions.
     """
 
-    inner: Any
+    inner: ConfigSource
 
 
 class ValueConflict(NamedTuple):
@@ -58,7 +60,7 @@ class ValueMissing(NamedTuple):
 
 
 def build_configuration(
-    source: dict[str, Json],
+    source: dict[str, ConfigSource],
     out: None | Configuration = None,
     prefix: str = '',
 ) -> Configuration:
