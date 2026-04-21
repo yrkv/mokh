@@ -56,18 +56,16 @@ type ConfigValue = Value | ValueConflict | ValueMissing
 
 
 class Configuration:
-    # _source: ConfigData
+    # TODO: descriptive information about where/how the configuration was
+    # created, for later errors/tracking/help
     _map: FrozenConfigurationDict
 
-    # def __init__(self, source: dict[str, ConfigSource] | ConfigData):
     def __init__(self, source: dict[str, ConfigSource]):
-        source = cool.deepfreeze(source)
-
         if source == {}:
             self._map = _freeze_configuration_dict({})
             return
 
-        # _source = ConfigData(source)
+        source = cool.deepfreeze(source)
         self._map = _build_configuration_map(source)
 
 
@@ -124,15 +122,6 @@ def _build_configuration_map(
     if out is None:
         out = {}
 
-    # source = ConfigData(source)
-    # if isinstance(source, ConfigData):
-    # source = source._data
-
-    # if not
-    # if not isinstance(source, (MappingProxyType, dict)):
-    # return {}
-    # raise ValueError('_build_configuration_map expects a mapping')
-
     for key, val in source.items():
         # it's not really clear how we might handle keys with dots at start/end...
         assert not key.startswith('.') and not key.endswith('.')
@@ -170,9 +159,6 @@ def _build_configuration_map(
         else:
             out[current_prefix][last] = Value(val)
 
-        # if isinstance(val, dict) or (
-        #    isinstance(val, ConfigData) and isinstance(val._data, MappingProxyType)
-        # ):
         if isinstance(val, dict):
             next_prefix = f'{current_prefix}.{last}'.strip('.')
             _build_configuration_map(val, out, prefix=next_prefix)
@@ -183,13 +169,14 @@ def _build_configuration_map(
 def merge_configurations(
     a: ConfigurationDict,
     b: ConfigurationDict,
-) -> FrozenConfigurationDict:
-    r"""Create a new `Configuration` which is equivalent to `a` with `b`
+) -> ConfigurationDict:
+    r"""Create a new `ConfigurationDict` which is equivalent to `a` with `b`
     overlaid on top, combining prefixes/parameter names and overriding values.
     - Contains all the prefixes and parameter names of both `a` and `b`.
     - Values in `b` override values in `a`.
-    - This does not modify `a` or `b`, but it *does* minimize copying. This
-      means many of the objects in the output are shared with `a` or `b`.
+    - This does not modify `a` or `b`, but it *does* avoid copying to some
+      extent. This means many of the objects in the output are shared with `a`
+      or `b`.
     """
 
     out: ConfigurationDict = {}
@@ -202,7 +189,7 @@ def merge_configurations(
         if prefix in b:
             out[prefix].update(b[prefix])
 
-    return _freeze_configuration_dict(out)
+    return out
 
 
 def configure(
@@ -234,6 +221,9 @@ class ConfigContextManager:
     def __enter__(self):
         self.prev = self.target._map
         self.target._map = merge_configurations(self.target._map, self.config._map)
+        # self.target._map = _freeze_configuration_dict(
+        #    merge_configurations(self.target._map, self.config._map)
+        # )
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self.target._map = self.prev
