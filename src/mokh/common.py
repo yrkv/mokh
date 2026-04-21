@@ -17,17 +17,6 @@ def is_dict_str_Any(x: Any) -> TypeGuard[dict[str, Any]]:
     return isinstance(x, dict) and all(isinstance(k, str) for k in x)
 
 
-type ConfigSource = list[ConfigSource] | dict[str, ConfigSource] | object
-"""
-Represents the source a configuration is defined from, or any subset of it. Any
-actual `Configuration` will contain (references to) subsets of the source as
-its values.
-
-Arbitrarily nestable structure intended to be a superset of `json`, `yaml`,
-`toml`, or other configuration/markup formats after they're loaded into python.
-"""
-
-
 class ConfigurableFunction(NamedTuple):
     prefixes: tuple[str, ...]
     kwonly_params: MappingProxyType[str, inspect.Parameter]

@@ -1,7 +1,7 @@
 from types import ModuleType
 from typing import Any, Callable
 
-from .common import ConfigSource
+from .configuration import ConfigSource
 
 type Handler = Callable[[ConfigSource], Any]
 
@@ -10,7 +10,7 @@ type Context = ModuleType | dict[str, Any]
 
 def listHandler(h: Handler) -> Handler:
     def out(config: ConfigSource) -> list[Any]:
-        assert isinstance(config, list)
+        assert isinstance(config, (list, tuple))
         return [h(val) for val in config]
 
     return out

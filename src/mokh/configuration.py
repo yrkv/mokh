@@ -1,43 +1,25 @@
 from collections.abc import Hashable
-from types import MappingProxyType
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
-from .common import ConfigSource, is_dict_str_Any
+import frozendict as cool
+from frozendict import frozendict
 
+type FrozenConfigSource = (
+    tuple[FrozenConfigSource, ...] | frozendict[str, FrozenConfigSource] | Hashable
+)
+"""
+Immutable subtype of `ConfigSource`, including all nested objects.
+"""
 
-class ConfigData:
-    __slots__ = ('_data',)
-    _data: tuple['ConfigData', ...] | MappingProxyType[str, 'ConfigData'] | Hashable
+type ConfigSource = list[ConfigSource] | dict[str, ConfigSource] | FrozenConfigSource
+"""
+Represents the source a configuration is defined from, or any subset of it. Any
+actual `Configuration` will contain (references to) subsets of the source as
+its values.
 
-    def __init__(self, data: 'ConfigSource | ConfigData'):
-        if isinstance(data, ConfigData):
-            self._data = data._data
-        elif isinstance(data, list):
-            self._data = tuple(ConfigData(x) for x in data)
-        elif is_dict_str_Any(data):
-            self._data = MappingProxyType(
-                {k: ConfigData(v) for k, v in data.items()}
-            )
-        elif isinstance(data, Hashable):
-            self._data = data
-        else:
-            raise ValueError('')
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._data, name)
-
-    def __eq__(self, other):
-        if self._data == other:
-            return True
-        if hasattr(other, '_data'):
-            return self._data == other._data
-        return False
-
-    def __hash__(self):
-        # force hashing to work :)
-        if isinstance(self._data, MappingProxyType):
-            return hash(tuple(sorted(self._data.items())))
-        return hash(self._data)
+Arbitrarily nestable structure intended to be a superset of `json`, `yaml`,
+`toml`, or other configuration/markup formats after they're loaded into python.
+"""
 
 
 type ConfigurationDict = dict[str, dict[str, ConfigValue]]
@@ -57,21 +39,17 @@ type ConfigurationDict = dict[str, dict[str, ConfigValue]]
 Expected to NOT be modified after creation. Should be considered immutable.
 """
 
-type ConfigurationMappingProxy = MappingProxyType[
-    str, MappingProxyType[str, ConfigValue]
-]
+type FrozenConfigurationDict = frozendict[str, frozendict[str, ConfigValue]]
 """
-Immutable view into a `ConfigurationDict`, making it hashable.
+Immutable `ConfigurationDict`, making it hashable.
 """
 
 
-def _configuration_mapping_proxy(d: ConfigurationDict):
+def _freeze_configuration_dict(d: ConfigurationDict):
     """
-    Convert a `ConfigurationDict` into a `ConfigurationMappingProxy`
+    Convert a `ConfigurationDict` into a `FrozenConfigurationDict`
     """
-    return MappingProxyType(
-        {prefix: MappingProxyType(params) for prefix, params in d.items()}
-    )
+    return frozendict({prefix: frozendict(params) for prefix, params in d.items()})
 
 
 type ConfigValue = Value | ValueConflict | ValueMissing
@@ -79,11 +57,14 @@ type ConfigValue = Value | ValueConflict | ValueMissing
 
 class Configuration:
     # _source: ConfigData
-    _map: ConfigurationMappingProxy
+    _map: FrozenConfigurationDict
 
-    def __init__(self, source: dict[str, ConfigSource] | ConfigData):
+    # def __init__(self, source: dict[str, ConfigSource] | ConfigData):
+    def __init__(self, source: dict[str, ConfigSource]):
+        source = cool.deepfreeze(source)
+
         if source == {}:
-            self._map = _configuration_mapping_proxy({})
+            self._map = _freeze_configuration_dict({})
             return
 
         # _source = ConfigData(source)
@@ -103,11 +84,12 @@ See `Configuration` for more details.
 
 class Value(NamedTuple):
     """
-    Contains anything, expected/assumed to contain a `ConfigData`. Deep
-    copied into corresponding arguments when invoking configurable functions.
+    Contains anything, expected/assumed to contain some subset of a
+    configuration (`ConfigSource`). Deep copied into corresponding arguments
+    when invoking configurable functions.
     """
 
-    inner: Any
+    inner: ConfigSource
 
 
 class ValueConflict(NamedTuple):
@@ -129,10 +111,10 @@ class ValueMissing(NamedTuple):
 
 
 def _build_configuration_map(
-    source: dict[str, ConfigSource] | ConfigData,
+    source: dict[str, ConfigSource],
     out: None | ConfigurationDict = None,
     prefix: str = '',
-) -> ConfigurationMappingProxy:
+) -> FrozenConfigurationDict:
     r"""Create a `Configuration` from a mapping, which is expected/intended to
     just be the content of a single config file.
 
@@ -188,19 +170,20 @@ def _build_configuration_map(
         else:
             out[current_prefix][last] = Value(val)
 
-        if isinstance(val, dict) or (
-            isinstance(val, ConfigData) and isinstance(val._data, MappingProxyType)
-        ):
+        # if isinstance(val, dict) or (
+        #    isinstance(val, ConfigData) and isinstance(val._data, MappingProxyType)
+        # ):
+        if isinstance(val, dict):
             next_prefix = f'{current_prefix}.{last}'.strip('.')
             _build_configuration_map(val, out, prefix=next_prefix)
 
-    return _configuration_mapping_proxy(out)
+    return _freeze_configuration_dict(out)
 
 
 def merge_configurations(
-    a: ConfigurationMappingProxy,
-    b: ConfigurationMappingProxy,
-) -> ConfigurationMappingProxy:
+    a: ConfigurationDict,
+    b: ConfigurationDict,
+) -> FrozenConfigurationDict:
     r"""Create a new `Configuration` which is equivalent to `a` with `b`
     overlaid on top, combining prefixes/parameter names and overriding values.
     - Contains all the prefixes and parameter names of both `a` and `b`.
@@ -219,7 +202,7 @@ def merge_configurations(
         if prefix in b:
             out[prefix].update(b[prefix])
 
-    return _configuration_mapping_proxy(out)
+    return _freeze_configuration_dict(out)
 
 
 def configure(

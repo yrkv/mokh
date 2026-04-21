@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.12" # 3.12 for `type` statement (PEP 695)
 dependencies = [
+    "frozendict>=2.4.7",
     "pyyaml>=6.0.3",
 ]
 
