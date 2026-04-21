@@ -1,6 +1,7 @@
 from mokh.configuration import (
+    # build_configuration,
+    Configuration,
     Value,
-    build_configuration,
     merge_configurations,
 )
 
@@ -24,9 +25,9 @@ def test_basic():
         },
     }
 
-    c1 = build_configuration(source1)
-    c2 = build_configuration(source2)
-    c = merge_configurations(c1, c2)
+    c1 = Configuration(source1)
+    c2 = Configuration(source2)
+    c = merge_configurations(c1._map, c2._map)
 
     assert c['']['alpha'] == Value(1)
     assert c['']['beta'] == Value(2)

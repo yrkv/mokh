@@ -2,17 +2,17 @@ from mokh.configuration import (
     Value,
     ValueConflict,
     ValueMissing,
-    build_configuration,
+    _build_configuration_map,
 )
 
 
 def test_empty():
-    assert build_configuration({}) == {}
+    assert _build_configuration_map({}) == {}
 
 
 def test_simple():
     # testing with no conflicts
-    c = build_configuration(
+    c = _build_configuration_map(
         {
             'a': 10,
             'foo.a': 20,
@@ -28,7 +28,7 @@ def test_simple():
 
 
 def test_merge_small():
-    c = build_configuration(
+    c = _build_configuration_map(
         {
             'train': {
                 'lr': 0.01,
@@ -50,7 +50,7 @@ def test_conflicts():
         'train': {'lr': 0.01, 'nonlinearity': 'LeakyReLU'},
         'train.nonlinearity': 'ReLU',
     }
-    c = build_configuration(source)
+    c = _build_configuration_map(source)
 
     assert c['']['ch_h'] == Value(32)
     assert c['']['train'] == Value(source['train'])
@@ -76,7 +76,7 @@ def test_other_0():
         'train.alpha': {'a': 10},
         'train.device': 'cuda',
     }
-    c = build_configuration(source)
+    c = _build_configuration_map(source)
 
     assert c['']['lr'] == Value(source['lr'])
     assert c['']['train'] == Value(source['train'])
