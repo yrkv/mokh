@@ -141,7 +141,8 @@ def _build_configuration_map(
             if sub_key not in out[partial_prefix]:
                 out[partial_prefix][sub_key] = ValueMissing()
             else:
-                ...  # TODO: warn
+                ...  # TODO: maybe warn -- there's a value set for something
+                # that *probably* shouldn't have a value
             partial_prefix = f'{partial_prefix}.{sub_key}'.strip('.')
 
         current_prefix = f'{prefix}.{".".join(the_rest)}'.strip('.')
@@ -156,7 +157,7 @@ def _build_configuration_map(
                     else:
                         out[current_prefix][last] = ValueConflict()
                 case ValueMissing():
-                    ...  # TODO: warn
+                    ...  # TODO: maybe warn -- same as earlier
                     out[current_prefix][last] = Value(val)
                 case ValueConflict():
                     ...  # TODO: add entry to conflict locations
