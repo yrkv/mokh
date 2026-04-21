@@ -1,7 +1,8 @@
 # Mokh
 
-Configuration library trying to stay out of the way as much as possible.
+Simple configuration library that tries to stay out of your way.
 
+What Mokh defines as "configuration" is a collection of adjustable settings.
 The primary goals are to be convenient and make it so you don't have to think
 about configuration when implementing other code.
 
