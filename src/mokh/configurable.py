@@ -15,6 +15,44 @@ from .configuration import (
 from .dynamic import Handler
 
 
+def _extract_config_values(
+    prefixes: tuple[str, ...],
+    sig: inspect.Signature,
+    configuration: Configuration,
+) -> dict[str, ConfigValue]:
+    config_values: dict[str, ConfigValue] = {}
+    for prefix in prefixes:
+        if prefix not in configuration._map:
+            continue
+
+        for name in configuration._map[prefix]:
+            if name not in sig.parameters:
+                continue
+            param = sig.parameters[name]
+
+            if param.kind is not inspect.Parameter.KEYWORD_ONLY:
+                ...  # TODO warn_configured_non_kwonly
+                continue
+
+            val = configuration._map[prefix][name]
+            match val:
+                case Value():
+                    config_values[name] = val
+                case ValueConflict():
+                    if isinstance(
+                        config_values[name],
+                        (ValueConflict, ValueMissing),
+                    ):
+                        config_values[name] = val
+                case ValueMissing():
+                    if isinstance(
+                        config_values[name],
+                        ValueMissing,
+                    ):
+                        config_values[name] = val
+    return config_values
+
+
 def configurable(
     *prefixes: str,
     handlers: dict[str, Handler] = {},
@@ -48,35 +86,7 @@ def configurable(
             if configuration._map in cache:
                 config_values = cache[configuration._map]
             else:
-                for prefix in prefixes:
-                    if prefix not in configuration._map:
-                        continue
-
-                    for name in configuration._map[prefix]:
-                        if name not in sig.parameters:
-                            continue
-                        param = sig.parameters[name]
-
-                        if param.kind is not inspect.Parameter.KEYWORD_ONLY:
-                            ...  # TODO warn_configured_non_kwonly
-                            continue
-
-                        val = configuration._map[prefix][name]
-                        match val:
-                            case Value(inner):
-                                config_values[name] = val
-                            case ValueConflict():
-                                if isinstance(
-                                    config_values[name],
-                                    (ValueConflict, ValueMissing),
-                                ):
-                                    config_values[name] = val
-                            case ValueMissing():
-                                if isinstance(
-                                    config_values[name],
-                                    ValueMissing,
-                                ):
-                                    config_values[name] = val
+                config_values = _extract_config_values(prefixes, sig, configuration)
 
                 if not disable_cache:
                     cache[configuration._map] = config_values

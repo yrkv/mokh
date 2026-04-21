@@ -214,7 +214,11 @@ class ConfigContextManager:
     variable, not the actual objects.
     """
 
-    def __init__(self, config: Configuration, target: Configuration = GLOBAL_CONFIG):
+    def __init__(
+        self,
+        config: Configuration,
+        target: Configuration = GLOBAL_CONFIG,
+    ):
         self.config = config
         self.target = target
 
