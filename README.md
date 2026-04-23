@@ -41,7 +41,7 @@ with mokh.configure(ch_in=16, ch_h=64, ch_out=16, lr=0.02):
     train(model, batch_size=8)
 ```
 
-For convenience, `mokh.configure_from_args()` provides a simple CLI wrapper
+For convenience, `mokh.configure_cli()` provides a simple CLI wrapper
 that makes it easy to use files as configuration sources or set values directly
 from the command line.
 
@@ -69,6 +69,16 @@ also overriding `ch_h` to be 128 in `setup_model`:
 python main.py -c config.yaml -c setup_model.ch_h=128
 ```
 
+All `mokh` context managers can also be used as decorators. This is equivalent to applying it as a context manager at the start of the function every time it is called. Note that `@configure` variants must come *before* `@configurable`.
+
+```python
+# default configuration file is 'config.yaml', if present.
+@mokh.configure_file('config.yaml', on_missing='ignore')
+@mokh.configure_cli() # apply standard mokh cli on top
+@mokh.configurable() # make `main` accept configuration options
+def main(*, verbose=False):
+    ...
+```
 
 
 
