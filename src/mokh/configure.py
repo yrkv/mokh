@@ -17,9 +17,22 @@ from .configuration import (
 )
 
 
-def _configuration_from_file(p: Path | str) -> Configuration:
+def _configuration_from_file(
+    p: Path | str,
+    on_missing: str = 'error',  # one of "error","warn","ignore"
+) -> Configuration:
     p = Path(p)
-    assert p.exists() and p.is_file()
+    if not p.exists():
+        match on_missing:
+            case 'error':
+                raise FileNotFoundError(f"No such file: '{p}'")
+            case 'warn':
+                ...  # TODO: warning
+                return Configuration({})
+            case 'ignore':
+                return Configuration({})
+
+    assert p.is_file()
     match p.suffix:
         case '.json':
             with open(p, 'rt') as f:
@@ -51,9 +64,12 @@ def configure(
     return ConfigContextManager(config._map)
 
 
-def configure_file(p: Path | str) -> AbstractContextManager:
+def configure_file(
+    p: Path | str,
+    on_missing: str = 'error',
+) -> AbstractContextManager:
 
-    config = _configuration_from_file(p)
+    config = _configuration_from_file(p, on_missing=on_missing)
     return ConfigContextManager(config._map)
 
 
