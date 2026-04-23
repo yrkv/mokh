@@ -41,7 +41,7 @@ def lookup(context: Context) -> Handler:
         return image.resize((256,256), resample)
 
     # Later, configured values are processed via the handler first
-    with configure(resample='NEAREST'):
+    with mokh.configure(resample='NEAREST'):
         final_image = finalize_image(image)
     ```
     """
@@ -125,7 +125,6 @@ def _find_rec(
     """
     Interpret `path` as a sequence of dot-delimited keys to access attributes
     or index into `context`.
-
     """
 
     if '.' in path:
