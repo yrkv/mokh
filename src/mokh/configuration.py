@@ -1,3 +1,4 @@
+import functools
 from collections.abc import Hashable, Mapping
 from typing import NamedTuple
 
@@ -222,3 +223,11 @@ class ConfigContextManager:
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self.target._map = self.prev
+
+    def __call__(self, fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            with self:
+                return fn(*args, **kwargs)
+
+        return wrapper
