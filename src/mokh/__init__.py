@@ -1,7 +1,7 @@
-#"""
-#.. include:: ../../README.md
+# """
+# .. include:: ../../README.md
 #    :start-line: 1
-#"""
+# """
 
 from . import common, configuration, dynamic
 from .configurable import configurable
