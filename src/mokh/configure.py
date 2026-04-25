@@ -66,10 +66,18 @@ def configure(
 
 def configure_file(
     p: Path | str,
-    on_missing: str = 'error',
+    on_missing: str | None = None,
+    # if set, equivalent to on_missing="ignore" (unless on_missing is provided)
+    optional: bool | None = None,
 ) -> AbstractContextManager:
-
-    config = _configuration_from_file(p, on_missing=on_missing)
+    if on_missing is not None:
+        config = _configuration_from_file(p, on_missing=on_missing)
+    elif optional is True:
+        config = _configuration_from_file(p, on_missing='ignore')
+    elif optional is False:
+        config = _configuration_from_file(p, on_missing='error')
+    else:
+        config = _configuration_from_file(p, on_missing='warn')
     return ConfigContextManager(config._map)
 
 
