@@ -10,6 +10,7 @@ wheels/
 .venv
 
 # Other
+.*_cache
 .python-version
 # for now, let's exclude it; maybe include in git later.
 uv.lock
