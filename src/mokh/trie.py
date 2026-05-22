@@ -1,7 +1,11 @@
 from collections.abc import Iterable
+from typing import Generic, TypeVar
+
+K = TypeVar('K')
+V = TypeVar('V')
 
 
-class TrieNode[K, V]:
+class TrieNode(Generic[K, V]):
     def __init__(
         self,
         value: V | None = None,

@@ -1,12 +1,12 @@
 import functools
 from collections.abc import Callable, Mapping, Sequence
 from types import ModuleType
-from typing import Any
+from typing import Any, TypeAlias
 
 from .common import is_dict_str_Any
 from .handler import Handler
 
-type Context = ModuleType | dict[str, Any]
+Context: TypeAlias = ModuleType | dict[str, Any]
 
 
 def lookup(context: Context) -> Handler:

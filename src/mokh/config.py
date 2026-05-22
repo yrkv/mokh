@@ -1,5 +1,5 @@
 import functools
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, TypeAlias
 
 from .common import is_dict_str_Any
 from .trie import TrieNode
@@ -11,7 +11,7 @@ Store a `Value` wrapper type in the `Config` values in order to distinguish
 between "there is no value" vs "the value is `None`".
 """
 
-type Config = TrieNode[str, Value]
+Config: TypeAlias = TrieNode[str, Value]
 """Each `Config` is a mapping from string paths to `Value`s. Each path can be
 thought of as a sequence of dot-delimited string keys.
 

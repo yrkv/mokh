@@ -1,7 +1,7 @@
 from collections.abc import Callable
-from typing import Any
+from typing import Any, TypeAlias
 
-type Handler = Callable[[Any], Any]
+Handler: TypeAlias = Callable[[Any], Any]
 
 
 def for_each(
