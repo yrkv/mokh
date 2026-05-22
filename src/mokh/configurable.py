@@ -1,141 +1,126 @@
 import functools
 import inspect
-from types import FunctionType, MappingProxyType
+from types import FunctionType
 
-from .common import GLOBAL_CONFIGURABLE_FUNCTIONS, ConfigurableFunction
-from .configuration import (
-    GLOBAL_CONFIG,
-    Configuration,
-    ConfigValue,
-    FrozenConfigurationDict,
-    Value,
-    ValueConflict,
-    ValueMissing,
-)
-from .dynamic import Handler
-
-
-def _extract_config_values(
-    prefixes: tuple[str, ...],
-    sig: inspect.Signature,
-    configuration: Configuration,
-) -> dict[str, ConfigValue]:
-    config_values: dict[str, ConfigValue] = {}
-    for prefix in prefixes:
-        if prefix not in configuration._map:
-            continue
-
-        for name in configuration._map[prefix]:
-            if name not in sig.parameters:
-                continue
-            param = sig.parameters[name]
-
-            if param.kind is not inspect.Parameter.KEYWORD_ONLY:
-                ...  # TODO warn_configured_non_kwonly
-                continue
-
-            val = configuration._map[prefix][name]
-            match val:
-                case Value():
-                    config_values[name] = val
-                case ValueConflict():
-                    if isinstance(
-                        config_values[name],
-                        (ValueConflict, ValueMissing),
-                    ):
-                        config_values[name] = val
-                case ValueMissing():
-                    if isinstance(
-                        config_values[name],
-                        ValueMissing,
-                    ):
-                        config_values[name] = val
-    return config_values
+from .config import CURRENT_CONFIG, ConfigSlot
+from .cursor import CONFIG_CURSOR, ConfigCursor, ConfigCursorSlot, _search_config
+from .handler import Handler
 
 
 def configurable(
-    *prefixes: str,
+    key: str | None = None,
+    /,
+    *,
     handlers: dict[str, Handler] = {},
-    # setattr_config_for_init: bool = False,
-    # warn_mismatched_type: bool = True,
-    # warn_configured_non_kwonly: bool = True,
-    configuration: Configuration = GLOBAL_CONFIG,
-    disable_cache: bool = False,
 ):
+    """
+    Context manager and function decorator which defines how the config is
+    interpreted and used.
 
-    # Cache injected kwargs per configuration. Since `Configuration._map` is
-    # frozen/hashable, we can just use that as the key without issues.
-    cache: dict[FrozenConfigurationDict, dict[str, ConfigValue]] = {}
+    As a context manager:
+    - The key defines an (optional) search prefix in the current config.
 
-    def decorator(fn):
-        nonlocal prefixes
-        if isinstance(fn, type):
-            raise TypeError('@configurable should decorate __init__, not the class')
+    As a function decorator:
+    - Applies self as a context manager before the wrapped function is called.
+    - The key can be inferred from the name of the function.
+        - If decorating an `__init__`, it uses the name of the class instead.
+    - Applies default values to keyword-only args from the config.
+        - Equivalent to `mokh.get(name, default=default)` for each unset param.
+    - See `ConfigurableContextManager.__call__` for more details.
+    """
+    return ConfigurableContextManager(
+        key=key,
+        handlers=handlers,
+    )
 
-        if prefixes == ():
-            prefixes = _generate_prefixes(fn)
 
+class ConfigurableContextManager:
+    def __init__(
+        self,
+        key: str | None = None,
+        handlers: dict[str, Handler] = {},
+        cursor: ConfigCursorSlot = CONFIG_CURSOR,
+        current_config: ConfigSlot = CURRENT_CONFIG,
+    ):
+        self.key = key
+        self.handlers = handlers
+        self.cursor = cursor
+        self.current_config = current_config
+        self.history: list[ConfigCursor] = []
+        self.is_decorator = False
+
+    def __enter__(self):
+        """@public"""
+        assert self.key is not None, 'key required'
+
+        self.cursor.check(self.current_config)
+        next_cursor = self.cursor.slot.descend(self.key)
+
+        self.history.append(self.cursor.slot)
+        self.cursor.slot = next_cursor
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        """@public"""
+        self.cursor.slot = self.history.pop()
+
+    def __call__(self, fn):
+        """@public
+        Use `self` as a decorator, wrapping a function with `self` as a
+        context manager and applying default values to keyword-only args.
+
+        See `configurable` for broad strokes of behavior.
+
+        `@configurable` intentionally applies only to keyword-only parameters,
+        as denoted by a `*` separator in the parameters. This both simplifies
+        the implementation and requires the user to clearly indicate which
+        paramters should be considered part of the configuration.
+
+        `@configurable` amends precedence for keyword-only parameters:
+        1. Directly passed in keyword arguments.
+        2. (added) Configured values, with "more specific" matches taking
+           precedence.
+            - See examples and test cases in `tests/configurable.py`.
+        3. Default values in the function definition.
+        """
+
+        if self.key is None:
+            self.key = _generate_key(fn)
         sig = inspect.signature(fn)
 
         @functools.wraps(fn)
-        def decorated(*args, **kwargs):
-            if len(configuration._map) == 0:
-                return fn(*args, **kwargs)
+        def wrapper(*args, **kwargs):
+            self.is_decorator = True
 
-            config_values = {}
-            if configuration._map in cache:
-                config_values = cache[configuration._map]
-            else:
-                config_values = _extract_config_values(prefixes, sig, configuration)
+            with self:
+                config_kwargs = {}
+                for param in sig.parameters.values():
+                    if param.kind is not inspect.Parameter.KEYWORD_ONLY:
+                        continue
+                    if param.name in kwargs:
+                        continue
 
-                if not disable_cache:
-                    cache[configuration._map] = config_values
+                    value = _search_config(param.name)
+                    if value is None:
+                        continue
+                    data = value.data
 
-            config_kwargs = {}
-            for name, val in config_values.items():
-                if name in kwargs:
-                    continue
-                match val:
-                    case Value(inner):
-                        if name in handlers:
-                            config_kwargs[name] = handlers[name](inner)
-                        else:
-                            config_kwargs[name] = inner
-                    case ValueConflict():
-                        ...  # TODO: warn_value_conflict
-                    case ValueMissing():
-                        ...  # TODO: warn_value_missing
+                    if param.name in self.handlers:
+                        data = self.handlers[param.name](data)
+                    config_kwargs[param.name] = data
 
-            new_kwargs = config_kwargs | kwargs
-            out = fn(*args, **new_kwargs)
+                new_kwargs = config_kwargs | kwargs
+                out = fn(*args, **new_kwargs)
 
+            self.is_decorator = False
             return out
 
-        _cache_configurable_function(fn, prefixes)
-        return decorated
-
-    return decorator
+        return wrapper
 
 
-def _generate_prefixes(
+def _generate_key(
     fn: FunctionType,
-) -> tuple[str, ...]:
-    name = fn.__name__
+) -> str:
     # If it's an __init__ of a class, use the class name instead
-    if name == '__init__':
-        name = fn.__qualname__.split('.')[-2]
-    return ('', name)
-
-
-def _cache_configurable_function(fn, prefixes):
-    global GLOBAL_CONFIGURABLE_FUNCTIONS
-
-    sig = inspect.signature(fn)
-    kwonly_params = MappingProxyType(
-        {
-            param.name: param
-            for param in sig.parameters.values()
-            if param.kind is inspect.Parameter.KEYWORD_ONLY
-        }
-    )
-    GLOBAL_CONFIGURABLE_FUNCTIONS[fn] = ConfigurableFunction(prefixes, kwonly_params)
+    if fn.__name__ == '__init__':
+        return fn.__qualname__.split('.')[-2]
+    return fn.__name__

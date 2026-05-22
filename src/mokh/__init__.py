@@ -3,18 +3,22 @@
 #    :start-line: 1
 # """
 
-from . import common, configuration, dynamic
+from . import common, config, dynamic
 from .configurable import configurable
 from .configure import configure, configure_cli, configure_file
+from .cursor import get
 
 __all__ = [
-    # Modules
-    'configurable',
-    'configure',
-    'configuration',
-    'dynamic',
-    'common',
     # Functions
+    'configurable',
+    'get',
+    'configure',
     'configure_cli',
     'configure_file',
+    # Modules
+    'config',
+    'dynamic',
+    'handler',
+    'common',
+    'cursor',
 ]

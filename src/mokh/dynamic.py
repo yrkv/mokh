@@ -4,27 +4,9 @@ from types import ModuleType
 from typing import Any
 
 from .common import is_dict_str_Any
-from .configuration import ConfigSource
-
-type Handler = Callable[[ConfigSource], Any]
+from .handler import Handler
 
 type Context = ModuleType | dict[str, Any]
-
-
-def for_each(
-    h: Handler,
-) -> Handler:
-    """Wrap a `Handler` to invoke it for every item in the config value."""
-
-    def out(config: ConfigSource) -> Any:
-        if isinstance(config, (list, tuple)):
-            return [h(val) for val in config]
-        elif isinstance(config, dict):
-            return {key: h(val) for key, val in config.items()}
-        else:
-            raise ValueError()
-
-    return out
 
 
 def lookup(context: Context) -> Handler:
@@ -46,10 +28,10 @@ def lookup(context: Context) -> Handler:
     ```
     """
 
-    def handler(config: ConfigSource):
+    def handler(value: Any):
         nonlocal context
-        assert isinstance(config, (str, dict))
-        return _inner_lookup(config, context)
+        assert isinstance(value, (str, dict))
+        return _inner_lookup(value, context)
 
     return handler
 
@@ -79,10 +61,10 @@ def dispatch(context: Context) -> Handler:
     ```
     """
 
-    def handler(config: ConfigSource):
+    def handler(value: Any):
         nonlocal context
-        assert isinstance(config, (str, dict))
-        fn = _inner_lookup(config, context)
+        assert isinstance(value, (str, dict))
+        fn = _inner_lookup(value, context)
         assert callable(fn)
         # We *could* add `*args, **kwargs` into the call here, but (for now) it
         # feels like an anti-pattern. Equivalent behavior is *probably* better

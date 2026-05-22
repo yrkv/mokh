@@ -1,12 +1,13 @@
 """
 Types, functions, and structures used throughout `mokh` without sufficient
-complexity to warrant their own file and without strong enough association with
-a specific submodule.
+complexity or specificity to warrant their own file and without strong enough
+association with a specific submodule.
 """
 
-import inspect
-from types import FunctionType, MappingProxyType
-from typing import Any, NamedTuple, TypeGuard
+from pathlib import Path
+from typing import Any, TypeGuard
+
+import __main__
 
 
 def is_dict_str_Any(x: Any) -> TypeGuard[dict[str, Any]]:
@@ -17,12 +18,17 @@ def is_dict_str_Any(x: Any) -> TypeGuard[dict[str, Any]]:
     return isinstance(x, dict) and all(isinstance(k, str) for k in x)
 
 
-class ConfigurableFunction(NamedTuple):
-    prefixes: tuple[str, ...]
-    kwonly_params: MappingProxyType[str, inspect.Parameter]
+def entry_point_name() -> str | None:
+    """
+    Returns the name of the running entry point, or `None` if unavailable.
 
-
-GLOBAL_CONFIGURABLE_FUNCTIONS: dict[FunctionType, ConfigurableFunction] = dict()
-"""
-Cache of all functions decorated with `@configurable(...)`.
-"""
+    Examples:
+    - `python scripts/train.py` -> `"train"`
+    - `./generate.py` -> `"generate"`
+    - `readelf.py` (if in PATH) -> `"readelf"`
+    - Python Interpreter -> `None`
+    """
+    filepath = getattr(__main__, '__file__', None)
+    if filepath is None:
+        return None
+    return Path(filepath).stem

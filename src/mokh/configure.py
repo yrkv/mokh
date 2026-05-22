@@ -2,37 +2,88 @@ import argparse
 import json
 import re
 import tomllib
+import warnings
 from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
+from typing import Any
 
 import yaml
 
 from .common import is_dict_str_Any
-from .configuration import (
-    ConfigContextManager,
-    ConfigSource,
-    Configuration,
-    ConfigurationDict,
-    merge_configurations,
+from .config import (
+    Config,
+    ConfigureContextManager,
+    build_config,
+    merge_configs,
 )
 
 
-def _configuration_from_file(
-    p: Path | str,
-    on_missing: str = 'error',  # one of "error","warn","ignore"
-) -> Configuration:
-    p = Path(p)
-    if not p.exists():
-        match on_missing:
-            case 'error':
-                raise FileNotFoundError(f"No such file: '{p}'")
-            case 'warn':
-                ...  # TODO: warning
-                return Configuration({})
-            case 'ignore':
-                return Configuration({})
+def configure(
+    source: dict[str, Any] = {},
+    /,
+    **kwargs: Any,
+) -> AbstractContextManager:
+    """Apply configuration values within some context.
 
-    assert p.is_file()
+    This interprets the args as a `mokh.config.Config` and updates
+    `mokh.config.CURRENT_CONFIG` with it.
+
+    Basic usage is to set config value(s) within a context. Then, those values
+    are accessible to `mokh.get` and applied to `@mokh.configurable` functions
+    called from that context.
+    ```python
+    @mokh.configurable()
+    def some_func(*, a):
+        print(f'a={a}')
+
+    with mokh.configure(a=10, b=20):
+        some_func() # prints "a=10"
+        print(f'b={mokh.get("b")}') # prints "b=20"
+    ```
+
+    More advanced usage would utilize nested dicts and/or dot-separated paths
+    to control which `mokh.configurable()` context to apply within.
+    ```python
+    @mokh.configurable()
+    def fn_a(*, x): print(f'fn_a: x={x}')
+    @mokh.configurable()
+    def fn_b(*, x):
+        fn_a()
+        print(f'fn_b: x={x}')
+
+    with mokh.configure({
+        'x': 1, # default value is x=1
+        'fn_a.x': 2, # but within fn_a, x=2
+        'fn_b.fn_a.x': 3, # except when fn_a is called from fn_b, then x=3
+    }):
+        fn_a()
+        # fn_a: x=2
+        fn_b()
+        # fn_a: x=3
+        # fn_b: x=1
+    ```
+    """
+
+    if len(source) > 0 and len(kwargs) > 0:
+        raise ValueError(
+            'Provide either a single positional arg or keyword arguments, not both'
+        )
+
+    if source == {}:
+        source = kwargs
+
+    config = build_config(source)
+    return ConfigureContextManager(config)
+
+
+def _config_from_file(
+    p: Path,
+) -> Config:
+    if not p.exists():
+        raise ErrMissing(f"No such file: '{p}'")
+    if not p.is_file():
+        raise ErrNotFile(f"Not a regular file: '{p}'")
+
     match p.suffix:
         case '.json':
             with open(p, 'rt') as f:
@@ -44,45 +95,70 @@ def _configuration_from_file(
             with open(p, 'rt') as f:
                 source = yaml.safe_load(f)
         case _:
-            # Make a pull request to add it! :)
-            raise ValueError(f'unsupported config filetype: "{p.suffix}"')
-    assert is_dict_str_Any(source)
-    return Configuration(source)
+            raise ErrUnsupported(f"Unsupported config filetype: '{p.suffix}'")
 
+    if not is_dict_str_Any(source):
+        raise ErrInvalidData(
+            f"Invalid data of type '{type(source)}' in config file '{p}'"
+        )
 
-def configure(
-    source: dict[str, ConfigSource] = {},
-    **kwargs: ConfigSource,
-) -> AbstractContextManager:
-    if len(source) >= 1 and len(kwargs) >= 1:
-        raise ValueError("Provide either 'source' or keyword arguments, not both")
-
-    if source == {}:
-        source = kwargs
-
-    config = Configuration(source)
-    return ConfigContextManager(config._map)
+    return build_config(source)
 
 
 def configure_file(
-    p: Path | str,
-    on_missing: str | None = None,
-    # if set, equivalent to on_missing="ignore" (unless on_missing is provided)
-    optional: bool | None = None,
+    path: Path | str,
+    /,
+    *,
+    on_missing: str = 'warn',
+    on_not_file: str = 'error',
+    on_unsupported: str = 'error',
+    on_invalid_data: str = 'error',
+    on_any_error: str | None = None,
 ) -> AbstractContextManager:
-    if on_missing is not None:
-        config = _configuration_from_file(p, on_missing=on_missing)
-    elif optional is True:
-        config = _configuration_from_file(p, on_missing='ignore')
-    elif optional is False:
-        config = _configuration_from_file(p, on_missing='error')
-    else:
-        config = _configuration_from_file(p, on_missing='warn')
-    return ConfigContextManager(config._map)
+    """Variant of `configure` which reads a file for the config.
+
+    `configure_file` allows defining handling of each possible error:
+    - `on_*` define behavior for each possible error:
+        - `"error"` -- raise the error.
+        - `"warn"` -- log a warning to stderr.
+        - `"ignore"` -- do nothing.
+    - `on_any_error` overrides all others, if set.
+    - Note default values for each option in function signature.
+    """
+
+    path = Path(path)
+    try:
+        config = _config_from_file(path)
+    except ConfigError as e:
+        handlers = {
+            ErrMissing: on_any_error or on_missing,
+            ErrNotFile: on_any_error or on_not_file,
+            ErrUnsupported: on_any_error or on_unsupported,
+            ErrInvalidData: on_any_error or on_invalid_data,
+        }
+        mode = handlers[type(e)]
+        match mode:
+            case 'error':
+                raise
+            case 'warn':
+                warnings.warn(str(e), stacklevel=2)
+            case 'ignore':
+                pass
+            case _:
+                raise ValueError(
+                    f"Invalid mode '{mode}'. Expected one of 'error', 'warn', 'ignore'"
+                )
+
+        return nullcontext()
+
+    return ConfigureContextManager(config)
 
 
-def configure_cli() -> AbstractContextManager:
-    """Gather configuration values from program arguments.
+def configure_cli(
+    short: str | None = '-c',
+    long: str | None = '--config',
+) -> AbstractContextManager:
+    """Variant of `configure` which gathers config values using arguments.
 
     Using `argparse`, it registers `-c` and `--config` to set configuration
     values. If provided with `<key>=<value>`, it attempts to interpret the value
@@ -100,8 +176,13 @@ def configure_cli() -> AbstractContextManager:
     """
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, action='append')
 
+    assert short is not None or long is not None
+    arg_short = [] if short is None else [short]
+    arg_long = [] if long is None else [long]
+    parser.add_argument(*arg_short, *arg_long, type=str, action='append')
+
+    # TODO:
     # parser.add_argument(
     #    '--mokh.query_functions', type=bool, action='store_true'
     # )
@@ -130,7 +211,7 @@ def configure_cli() -> AbstractContextManager:
         if match_json is not None:
             j = json.loads(c)
             assert is_dict_str_Any(j)
-            configs.append(Configuration(j))
+            configs.append(build_config(j))
             continue
 
         # second case is {key}={value}
@@ -138,15 +219,30 @@ def configure_cli() -> AbstractContextManager:
         if match_key_eq_value is not None:
             key, value = match_key_eq_value.groups()
             value = json.loads(value)
-            configs.append(Configuration({key: value}))
+            configs.append(build_config({key: value}))
             continue
 
         # third case is to read it as a file
         p = Path(c)
-        configs.append(_configuration_from_file(p))
+        configs.append(_config_from_file(p))
 
-    cdict: ConfigurationDict = {}
+    merged_config: Config = build_config({})
     for config in configs:
-        cdict = merge_configurations(cdict, config._map)
+        merged_config = merge_configs(merged_config, config)
 
-    return ConfigContextManager(config_dict=cdict)
+    return ConfigureContextManager(merged_config)
+
+
+class ConfigError(Exception): ...
+
+
+class ErrMissing(ConfigError, FileNotFoundError): ...
+
+
+class ErrNotFile(ConfigError, ValueError): ...
+
+
+class ErrUnsupported(ConfigError, ValueError): ...
+
+
+class ErrInvalidData(ConfigError, ValueError): ...
