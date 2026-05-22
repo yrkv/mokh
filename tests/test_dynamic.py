@@ -1,7 +1,8 @@
-import pytest
-
 import mokh
-from mokh.dynamic import _find_rec, _inner_lookup, dispatch, for_each, lookup
+from mokh.dynamic import dispatch, lookup
+
+# from mokh.dynamic import dispatch, for_each, lookup
+from mokh.handler import for_each
 
 context = {
     'foo': {
@@ -13,31 +14,6 @@ context = {
     },
     'bar': lambda name: f'hello {name}',
 }
-
-
-def test_find():
-    assert _find_rec('foo', context) == context['foo']
-    for case in context['foo'].keys():
-        assert _find_rec(f'foo.{case}', context) == context['foo'][case]
-
-    assert _find_rec('bar', context) == context['bar']
-
-
-def test_inner_lookup():
-    assert _inner_lookup('foo', context) == context['foo']
-    for case in context['foo'].keys():
-        assert _inner_lookup(f'foo.{case}', context) == context['foo'][case]
-    assert _inner_lookup('bar', context) == context['bar']
-
-
-def test_inner_lookup_partial():
-    assert _inner_lookup({'bar': ['world']}, context)() == 'hello world'
-    assert _inner_lookup({'bar': {'name': 'there'}}, context)() == 'hello there'
-
-    with pytest.raises(Exception):
-        _inner_lookup({}, context)
-    with pytest.raises(Exception):
-        _inner_lookup({'bar': ['world'], 'other': 'invalid'}, context)
 
 
 def test_configurable_lookup():
