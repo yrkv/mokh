@@ -1,17 +1,17 @@
 import functools
 import inspect
 from types import FunctionType
+from typing import Any, Callable
 
 from .config import CURRENT_CONFIG, ConfigSlot
 from .cursor import CONFIG_CURSOR, ConfigCursor, ConfigCursorSlot, _search_config
-from .handler import Handler
 
 
 def configurable(
     key: str | None = None,
     /,
     *,
-    handlers: dict[str, Handler] = {},
+    handlers: dict[str, Callable[[Any], Any]] = {},
 ):
     """
     Context manager and function decorator which defines how the config is
@@ -38,7 +38,7 @@ class ConfigurableContextManager:
     def __init__(
         self,
         key: str | None = None,
-        handlers: dict[str, Handler] = {},
+        handlers: dict[str, Callable[[Any], Any]] = {},
         cursor: ConfigCursorSlot = CONFIG_CURSOR,
         current_config: ConfigSlot = CURRENT_CONFIG,
     ):

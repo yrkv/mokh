@@ -1,17 +1,54 @@
 import functools
 from collections.abc import Callable, Mapping, Sequence
 from types import ModuleType
-from typing import Any, TypeAlias
+from typing import Any, TypeAlias, TypeGuard
 
 from .common import is_dict_str_Any
-from .handler import Handler
 
 Context: TypeAlias = ModuleType | dict[str, Any]
+"""
+Usable target for `lookup` and `dispatch`.
+
+Realistically, the only constraint is that it has to provide either indexing
+using [] or contain attributes.
+"""
+
+LookupValue: TypeAlias = str | dict[str, list[Any]] | dict[str, dict[str, Any]]
+"""
+Represents any form of config value usable as the input for lookup/dispatch.
+- `str` -- sequence of dot-delimited keys to access attributes or index.
+    - e.g. `"a.b.c"`
+    - => `context.a.b.c`, `context[a][b][c]`, or any mix of those.
+- length-1 `dict[str, list[Any] | dict[str, Any]]` -- Use the key for
+  access/indexing to find a function, value contains `*args` if it's a `list`
+  or `**kwargs` if it's a `dict`. `dispatch` will actually call the function,
+  whereas `lookup` will only do partial application.
+    - e.g. `{"foo.bar": ["a", 10]}`
+    - => `functools.partial(context.foo.bar, "a", 10)`
+    - e.g. `{"foo.bar": {"a":10, "b":"text"}}`
+    - => `functools.partial(context.foo.bar, a=10, b="text")`
+"""
 
 
-def lookup(context: Context) -> Handler:
+def is_LookupValue(x: Any) -> TypeGuard[LookupValue]:
+    """@private"""
+    if isinstance(x, str):
+        return True
+
+    if isinstance(x, dict):
+        if len(x) != 1:
+            return False
+        key, val = next(iter(x.items()))
+        return isinstance(key, str) and (
+            isinstance(val, list) or is_dict_str_Any(val)
+        )
+
+    return False
+
+
+def lookup(context: Context) -> Callable[[LookupValue], Any]:
     r"""Create a configuration handler that dynamically finds a value within
-    `context` using the corresponding configuration part to as the lookup path.
+    `context` using the configuration value as the lookup path.
 
     Example:
     ```python
@@ -28,18 +65,18 @@ def lookup(context: Context) -> Handler:
     ```
     """
 
-    def handler(value: Any):
+    def handler(value: LookupValue) -> Any:
         nonlocal context
-        assert isinstance(value, (str, dict))
+        assert is_LookupValue(value)
         return _inner_lookup(value, context)
 
     return handler
 
 
-def dispatch(context: Context) -> Handler:
+def dispatch(context: Context) -> Callable[[LookupValue], Any]:
     r"""Create a configuration handler to dynamically invoke a constructor (or
-    more generally, any function) within `context` using the corresponding
-    configuration part to as the lookup path.
+    more generally, any function) within `context` using the configuration
+    value as the lookup path.
 
     Example:
     ```python
@@ -61,9 +98,9 @@ def dispatch(context: Context) -> Handler:
     ```
     """
 
-    def handler(value: Any):
+    def handler(value: LookupValue) -> Any:
         nonlocal context
-        assert isinstance(value, (str, dict))
+        assert is_LookupValue(value)
         fn = _inner_lookup(value, context)
         assert callable(fn)
         # We *could* add `*args, **kwargs` into the call here, but (for now) it
@@ -75,17 +112,18 @@ def dispatch(context: Context) -> Handler:
 
 
 def _inner_lookup(
-    value: str | dict[str, list[Any]] | dict[str, dict[str, Any]],
+    value: LookupValue,
     context: Context,
 ) -> Any:
     """
     - value="a.b.c"
-        -> `context.a.b.c`, `context[a][b][c]`, or any mix of those.
+        - => `context.a.b.c`, `context[a][b][c]`, or any mix of those.
     - value={"foo.bar": [a, b, c]}
-        -> `functools.partial(context.foo.bar, a, b, c)`
+        - => `functools.partial(context.foo.bar, a, b, c)`
     - value={"foo.bar": {"a":10, "b":20}}
-        -> `functools.partial(context.foo.bar, a=10, b=20)`
+        - => `functools.partial(context.foo.bar, a=10, b=20)`
     """
+    assert is_LookupValue(value), 'TODO: error properly here'
 
     if isinstance(value, str):
         return _find_rec(value, context)

@@ -131,12 +131,12 @@ def configure_file(
         config = _config_from_file(path)
     except ConfigError as e:
         handlers = {
-            ErrMissing: on_any_error or on_missing,
-            ErrNotFile: on_any_error or on_not_file,
-            ErrUnsupported: on_any_error or on_unsupported,
-            ErrInvalidData: on_any_error or on_invalid_data,
+            ErrMissing: on_missing,
+            ErrNotFile: on_not_file,
+            ErrUnsupported: on_unsupported,
+            ErrInvalidData: on_invalid_data,
         }
-        mode = handlers[type(e)]
+        mode = on_any_error or handlers[type(e)]
         match mode:
             case 'error':
                 raise
@@ -233,16 +233,21 @@ def configure_cli(
     return ConfigureContextManager(merged_config)
 
 
-class ConfigError(Exception): ...
+class ConfigError(Exception):
+    """Base class for errors related to `mokh` processing of config files."""
 
 
-class ErrMissing(ConfigError, FileNotFoundError): ...
+class ErrMissing(ConfigError, FileNotFoundError):
+    """File does not exist."""
 
 
-class ErrNotFile(ConfigError, ValueError): ...
+class ErrNotFile(ConfigError, ValueError):
+    """File is not a regular file (e.g. directory)"""
 
 
-class ErrUnsupported(ConfigError, ValueError): ...
+class ErrUnsupported(ConfigError, ValueError):
+    """Unsupported file extension provide."""
 
 
-class ErrInvalidData(ConfigError, ValueError): ...
+class ErrInvalidData(ConfigError, ValueError):
+    """Invalid configuration data (e.g. not a mapping at top-level)."""
