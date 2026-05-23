@@ -1,7 +1,6 @@
 import argparse
 import json
 import re
-import tomllib
 import warnings
 from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
@@ -89,6 +88,13 @@ def _config_from_file(
             with open(p, 'rt') as f:
                 source = json.load(f)
         case '.toml':
+            try:
+                import tomllib  # type: ignore[import-not-found]
+            except ModuleNotFoundError as e:
+                raise ErrUnsupported(
+                    'mokh: TOML support requires Python 3.11+'
+                ) from e
+
             with open(p, 'rb') as f:
                 source = tomllib.load(f)
         case '.yaml':

@@ -134,9 +134,9 @@ class ConfigurableContextManager:
                         warn_mismatched_type
                         and param.annotation is not inspect.Parameter.empty
                     ):
-                        from beartype.door import is_bearable
+                        import beartype.door  # type: ignore[import-not-found]
 
-                        if not is_bearable(data, param.annotation):
+                        if not beartype.door.is_bearable(data, param.annotation):
                             warnings.warn(
                                 f'Parameter `{param}` received non-matching value of type `{type(data)}`.',
                                 stacklevel=2,
