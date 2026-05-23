@@ -1,5 +1,6 @@
 
 line-length = 85
+include = [ "pyproject.toml", "src/**/*.py", "tests/**/*.py" ]
 
 [lint]
 extend-select = ["I"]
