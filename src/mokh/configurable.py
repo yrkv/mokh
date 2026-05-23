@@ -1,10 +1,15 @@
 import functools
 import inspect
+import warnings
+from importlib.util import find_spec
 from types import FunctionType
 from typing import Any, Callable
 
 from .config import CURRENT_CONFIG, ConfigSlot
-from .cursor import CONFIG_CURSOR, ConfigCursor, ConfigCursorSlot, _search_config
+from .cursor import CONFIG_CURSOR, ConfigCursor, ConfigCursorSlot, _config_get
+from .cursor import get as mokh_get
+
+_HAS_BEARTYPE = find_spec('beartype') is not None
 
 
 def configurable(
@@ -92,20 +97,51 @@ class ConfigurableContextManager:
             self.is_decorator = True
 
             with self:
+                warn_configured_non_kwonly = mokh_get(
+                    'mokh',
+                    'warn_configured_non_kwonly',
+                    default=True,
+                )
+                warn_mismatched_type = mokh_get(
+                    'mokh',
+                    'warn_mismatched_type',
+                    default=_HAS_BEARTYPE,
+                )
+
                 config_kwargs = {}
                 for param in sig.parameters.values():
                     if param.kind is not inspect.Parameter.KEYWORD_ONLY:
+                        if (
+                            warn_configured_non_kwonly
+                            and _config_get([param.name]) is not None
+                        ):
+                            warnings.warn(
+                                f'Configured value found for non keyword-only param `{param.name}`.'
+                            )
                         continue
                     if param.name in kwargs:
                         continue
 
-                    value = _search_config(param.name)
+                    value = _config_get([param.name])
                     if value is None:
                         continue
                     data = value.data
 
                     if param.name in self.handlers:
                         data = self.handlers[param.name](data)
+
+                    if (
+                        warn_mismatched_type
+                        and param.annotation is not inspect.Parameter.empty
+                    ):
+                        from beartype.door import is_bearable
+
+                        if not is_bearable(data, param.annotation):
+                            warnings.warn(
+                                f'Parameter `{param}` received non-matching value of type `{type(data)}`.',
+                                stacklevel=2,
+                            )
+
                     config_kwargs[param.name] = data
 
                 new_kwargs = config_kwargs | kwargs

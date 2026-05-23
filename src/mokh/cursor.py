@@ -2,6 +2,7 @@
 Recursive traversal through and searching of `mokh.config.Config` instances.
 """
 
+from collections.abc import Iterable
 from typing import Any
 
 from .config import CURRENT_CONFIG, Config, ConfigSlot, Value, merge_configs
@@ -11,9 +12,7 @@ _SENTINEL_RAISE_ERROR = object()
 
 
 def get(
-    key: str,
-    /,
-    *,
+    *keys: str,
     default: Any = _SENTINEL_RAISE_ERROR,
 ) -> Any:
     """
@@ -23,11 +22,11 @@ def get(
     Default behavior is to raise error if not found. Set `default` to any value
     to make it the default.
     """
-    out = _search_config(key)
+    out = _config_get(keys)
     if out is not None:
         return out.data
     if default is _SENTINEL_RAISE_ERROR:
-        raise ValueError(f'{repr(key)} not found in current config search index')
+        raise ValueError(f'{repr(keys)} not found in current config search index')
     return default
 
 
@@ -64,14 +63,8 @@ class ConfigCursor:
         self._cache_descend[key] = out
         return out
 
-    def search(self, key: str) -> Value | None:
-        if (
-            key in self.config.children
-            and self.config.children[key].value is not None
-        ):
-            return self.config.children[key].value
-
-        return None
+    def get(self, keys: Iterable[str]) -> Value | None:
+        return self.config[keys]
 
     def _descend_inplace(self, key: str):
         self.full_path = self.full_path + [key]
@@ -107,11 +100,11 @@ class ConfigCursorSlot:
 CONFIG_CURSOR: ConfigCursorSlot = ConfigCursorSlot(ConfigCursor(CURRENT_CONFIG.slot))
 
 
-def _search_config(
-    key: str,
+def _config_get(
+    keys: Iterable[str],
     *,
     cursor: ConfigCursorSlot = CONFIG_CURSOR,
     current_config: ConfigSlot = CURRENT_CONFIG,
 ) -> Value | None:
     cursor.check(current_config)
-    return cursor.slot.search(key)
+    return cursor.slot.get(keys)
