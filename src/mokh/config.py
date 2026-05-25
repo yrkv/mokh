@@ -1,5 +1,5 @@
 import functools
-from typing import Any, NamedTuple, TypeAlias
+from typing import Any, Callable, NamedTuple, TypeAlias
 
 from .common import is_dict_str_Any
 from .trie import TrieNode
@@ -104,19 +104,17 @@ class ConfigureContextManager:
 
     def __init__(
         self,
-        config: Config,
+        f: Callable[[Config], Config],
         *,
         current_config: ConfigSlot = CURRENT_CONFIG,
     ):
-        self.config = config
+        self.f = f
         self.current_config = current_config
         self.history: list[Config] = []
 
     def __enter__(self):
         self.history.append(self.current_config.slot)
-        self.current_config.slot = merge_configs(
-            self.current_config.slot, self.config
-        )
+        self.current_config.slot = self.f(self.current_config.slot)
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self.current_config.slot = self.history.pop()
