@@ -51,7 +51,7 @@ class ConfigurableContextManager:
         self.current_config = current_config
 
         def configure_fn(config: TrieNode) -> TrieNode:
-            sub_config = config.get([self.key])
+            sub_config = config.get_node([self.key])
             if sub_config is None:
                 return config
             return config.merge(sub_config)
