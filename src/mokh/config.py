@@ -1,4 +1,5 @@
 import functools
+from collections.abc import Generator
 from typing import Any, Callable, TypeAlias
 
 from .common import is_dict_str_Any
@@ -14,35 +15,30 @@ we can retrieve subsets based on a prefix.
 """
 
 
+def flatten_config_source(
+    source: dict[str, Any],
+) -> Generator[tuple[list[str], Any]]:
+    for key, val in source.items():
+        # it's not really clear how we might handle keys with dots at start/end
+        assert not key.startswith('.') and not key.endswith('.')
+        keys = key.split('.')
+
+        yield (keys, val)
+
+        if is_dict_str_Any(val):
+            for sub_keys, sub_val in flatten_config_source(val):
+                yield (keys + sub_keys, sub_val)
+
+
 def build_config(
     source: dict[str, Any],
-    keys: tuple[str, ...] = (),
-    root: Config | None = None,
 ) -> Config:
     """Create a `Config` trie from a (potentially nested) dict source.
 
-    This does NOT deep copy from the source dict, so the source should be
-    considered "used up" afterwards.
+    This does NOT deep copy values from the source dict, so the source should
+    be considered "used up" afterwards.
     """
-    if root is None:
-        root = TrieNode()
-
-    for key, val in source.items():
-        # it's not really clear how we might handle keys with dots at start/end...
-        assert not key.startswith('.') and not key.endswith('.')
-
-        current_keys = (*keys, *key.split('.'))
-
-        old_node = root.get(current_keys)
-        if old_node is not None and old_node.value is not _NO_VALUE:
-            assert False, 'invalid overlap'
-
-        root[current_keys] = val
-
-        if is_dict_str_Any(val):
-            build_config(val, current_keys, root)
-
-    return root
+    return TrieNode.from_pairs(flatten_config_source(source))
 
 
 class ConfigSlot:

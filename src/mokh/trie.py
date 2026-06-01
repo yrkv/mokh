@@ -8,16 +8,41 @@ class _NO_VALUE:
 
 
 class TrieNode:
+    value: Any | _NO_VALUE
+    children: dict[Hashable, 'TrieNode']
+
     def __init__(
         self,
-        value: Any | _NO_VALUE = _NO_VALUE,
         *,
+        value: Any | _NO_VALUE = _NO_VALUE,
         children: dict[Hashable, 'TrieNode'] | None = None,
     ):
-        self.value = value
         if children is None:
             children = {}
-        self.children = children
+        object.__setattr__(self, 'value', value)
+        object.__setattr__(self, 'children', children)
+
+    # Note: we bypass this with `object.__setattr__` during initialization
+    def __setattr__(self, name: str, value: Any):
+        raise ImmutableError('Attributes cannot be modified')
+
+    @classmethod
+    def from_pairs(cls, pairs: Iterable[tuple[Iterable[Hashable], Any]]):
+        root = cls()
+        for keys, value in pairs:
+            root._set_value(keys, value)
+        return root
+
+    def _set_value(self, keys: Iterable[Hashable], value: Any | _NO_VALUE, /):
+        current = self
+        for key in keys:
+            if key not in current.children:
+                current.children[key] = TrieNode()
+            current = current.children[key]
+
+        if current.value is not _NO_VALUE:
+            raise ImmutableError(f'Value for {keys!r} is already set')
+        object.__setattr__(current, 'value', value)
 
     def get(self, keys: Iterable[Hashable], /) -> 'TrieNode' | None:
         current = self
@@ -32,14 +57,6 @@ class TrieNode:
         if out_node is None:
             return _NO_VALUE
         return out_node.value
-
-    def __setitem__(self, keys: Iterable[Hashable], value: Any | _NO_VALUE, /):
-        current = self
-        for key in keys:
-            if key not in current.children:
-                current.children[key] = TrieNode()
-            current = current.children[key]
-        current.value = value
 
     def merge(self, other: 'TrieNode') -> 'TrieNode':
         value = copy.copy(self.value)
@@ -79,3 +96,7 @@ class TrieNode:
         value_str = () if self.value is _NO_VALUE else (f'value={self.value}',)
         children_str = () if self.children == {} else (f'children={self.children}',)
         return f'TrieNode({", ".join([*value_str, *children_str])})'
+
+
+class ImmutableError(Exception):
+    """Attempting to modify an immutable object."""
