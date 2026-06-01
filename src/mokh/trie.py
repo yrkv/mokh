@@ -59,7 +59,7 @@ class TrieNode:
         return out_node.value
 
     def merge(self, other: 'TrieNode') -> 'TrieNode':
-        value = copy.copy(self.value)
+        value = self.value
         children = copy.copy(self.children)
 
         if other.value is not _NO_VALUE:
