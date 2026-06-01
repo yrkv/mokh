@@ -1,3 +1,5 @@
+import pytest
+
 import mokh
 
 
@@ -37,6 +39,16 @@ def test_default_prefixes():
         assert train() == 0.01
         assert train_other() == 0.02
         assert train_another() == 0.03
+
+
+def test_overlap():
+    with pytest.raises(Exception):
+        mokh.configure(
+            {
+                'a.b': 10,
+                'a': {'b': 20},
+            }
+        )
 
 
 def test_more():
