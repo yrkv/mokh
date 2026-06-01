@@ -10,8 +10,9 @@ class TrieNode:
     """
     Simple immutable [trie](https://en.wikipedia.org/wiki/Trie).
 
-    Note: not *truly* immutable. Python follows a "consenting adults"
-    philosopy, allowing bypass of conventions and access to internals.
+    Note: not *truly* immutable, only intended to be treated as immutable.
+    Python follows a "consenting adults" philosophy, allowing bypass of
+    conventions and access to internals when necessary.
     """
 
     value: Any | _NO_VALUE
@@ -38,7 +39,7 @@ class TrieNode:
         Construct a trie from an iterable to pairs containing a prefix of keys
         and the corresponding value to assign there.
 
-        It is an error for two sequences of values to map to the same value.
+        It is an error to have two of the same key sequence.
         """
         root = cls()
         for keys, value in pairs:
