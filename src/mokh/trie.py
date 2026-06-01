@@ -39,6 +39,9 @@ class TrieNode:
         Construct a trie from an iterable to pairs containing a prefix of keys
         and the corresponding value to assign there.
 
+        If constructing from a dict or other mapping, you can use `.items()` to
+        create the requisite pairs to pass as input.
+
         It is an error to have two of the same key sequence.
         """
         root = cls()
