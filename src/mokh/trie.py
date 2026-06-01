@@ -9,10 +9,13 @@ class _NO_VALUE:
 class TrieNode:
     """
     Simple immutable [trie](https://en.wikipedia.org/wiki/Trie).
+
+    Note: not *truly* immutable. Python follows a "consenting adults"
+    philosopy, allowing bypass of conventions and access to internals.
     """
 
     value: Any | _NO_VALUE
-    children: dict[Hashable, 'TrieNode']
+    _children: dict[Hashable, 'TrieNode']
 
     def __init__(
         self,
@@ -23,7 +26,7 @@ class TrieNode:
         if children is None:
             children = {}
         object.__setattr__(self, 'value', value)
-        object.__setattr__(self, 'children', children)
+        object.__setattr__(self, '_children', children)
 
     # Note: we bypass this with `object.__setattr__` during initialization
     def __setattr__(self, name: str, value: Any):
@@ -45,9 +48,9 @@ class TrieNode:
     def _set_value(self, keys: Iterable[Hashable], value: Any | _NO_VALUE, /):
         current = self
         for key in keys:
-            if key not in current.children:
-                current.children[key] = TrieNode()
-            current = current.children[key]
+            if key not in current._children:
+                current._children[key] = TrieNode()
+            current = current._children[key]
 
         if current.value is not _NO_VALUE:
             raise ImmutableError(f'Value for {keys!r} is already set')
@@ -56,9 +59,9 @@ class TrieNode:
     def get_node(self, keys: Iterable[Hashable], /) -> 'TrieNode' | None:
         current = self
         for key in keys:
-            if key not in current.children:
+            if key not in current._children:
                 return None
-            current = current.children[key]
+            current = current._children[key]
         return current
 
     def __getitem__(self, keys: Iterable[Hashable], /) -> Any | _NO_VALUE:
@@ -73,16 +76,16 @@ class TrieNode:
         the other trie taking priority over values from self.
         """
         value = self.value
-        children = self.children.copy()
+        children = self._children.copy()
 
         if other.value is not _NO_VALUE:
             value = other.value
 
-        for key in other.children:
+        for key in other._children:
             if key in children:
-                children[key] = children[key].merge(other.children[key])
+                children[key] = children[key].merge(other._children[key])
             else:
-                children[key] = other.children[key]
+                children[key] = other._children[key]
 
         return TrieNode(value=value, children=children)
 
@@ -92,8 +95,8 @@ class TrieNode:
     def _str_helper(self, indent='', indent_last='  ', indent_more='| ') -> str:
         out = ''
 
-        count = len(self.children)
-        for i, (key, val) in enumerate(self.children.items()):
+        count = len(self._children)
+        for i, (key, val) in enumerate(self._children.items()):
             indent_str = indent_more if i < count - 1 else indent_last
             out_value = '' if val.value is _NO_VALUE else f' value={val.value}'
             out += f'{indent}{repr(key)}{out_value}\n'
@@ -107,7 +110,9 @@ class TrieNode:
 
     def __repr__(self) -> str:
         value_str = () if self.value is _NO_VALUE else (f'value={self.value}',)
-        children_str = () if self.children == {} else (f'children={self.children}',)
+        children_str = (
+            () if self._children == {} else (f'children={self._children}',)
+        )
         return f'TrieNode({", ".join([*value_str, *children_str])})'
 
 
