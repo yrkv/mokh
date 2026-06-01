@@ -5,9 +5,9 @@ from importlib.util import find_spec
 from types import FunctionType
 from typing import Any, Callable
 
-from .config import CURRENT_CONFIG, ConfigSlot
-from .cursor import CONFIG_CURSOR, ConfigCursor, ConfigCursorSlot, _config_get
-from .cursor import get as mokh_get
+from .config import CURRENT_CONFIG, ConfigSlot, ConfigureContextManager
+from .config import get as mokh_get
+from .trie import _NO_VALUE, TrieNode
 
 _HAS_BEARTYPE = find_spec('beartype') is not None
 
@@ -44,29 +44,30 @@ class ConfigurableContextManager:
         self,
         key: str | None = None,
         handlers: dict[str, Callable[[Any], Any]] = {},
-        cursor: ConfigCursorSlot = CONFIG_CURSOR,
         current_config: ConfigSlot = CURRENT_CONFIG,
     ):
         self.key = key
         self.handlers = handlers
-        self.cursor = cursor
         self.current_config = current_config
-        self.history: list[ConfigCursor] = []
-        self.is_decorator = False
+
+        def configure_fn(config: TrieNode) -> TrieNode:
+            sub_config = config.get([self.key])
+            if sub_config is None:
+                return config
+            return config.merge(sub_config)
+
+        self.configure_cm = ConfigureContextManager(
+            configure_fn, current_config=self.current_config
+        )
 
     def __enter__(self):
         """@public"""
         assert self.key is not None, 'key required'
-
-        self.cursor.check(self.current_config)
-        next_cursor = self.cursor.slot.descend(self.key)
-
-        self.history.append(self.cursor.slot)
-        self.cursor.slot = next_cursor
+        self.configure_cm.__enter__()
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         """@public"""
-        self.cursor.slot = self.history.pop()
+        self.configure_cm.__exit__(exc_type, exc_value, exc_traceback)
 
     def __call__(self, fn):
         """@public
@@ -94,18 +95,19 @@ class ConfigurableContextManager:
 
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
-            self.is_decorator = True
 
             with self:
                 warn_configured_non_kwonly = mokh_get(
                     'mokh',
                     'warn_configured_non_kwonly',
                     default=True,
+                    current_config=self.current_config,
                 )
                 warn_mismatched_type = mokh_get(
                     'mokh',
                     'warn_mismatched_type',
                     default=_HAS_BEARTYPE,
+                    current_config=self.current_config,
                 )
 
                 config_kwargs = {}
@@ -113,7 +115,8 @@ class ConfigurableContextManager:
                     if param.kind is not inspect.Parameter.KEYWORD_ONLY:
                         if (
                             warn_configured_non_kwonly
-                            and _config_get([param.name]) is not None
+                            and self.current_config.slot[[param.name]]
+                            is not _NO_VALUE
                         ):
                             warnings.warn(
                                 f'Configured value found for non keyword-only param `{param.name}`.'
@@ -122,13 +125,12 @@ class ConfigurableContextManager:
                     if param.name in kwargs:
                         continue
 
-                    value = _config_get([param.name])
-                    if value is None:
+                    value = self.current_config.slot[[param.name]]
+                    if value is _NO_VALUE:
                         continue
-                    data = value.data
 
                     if param.name in self.handlers:
-                        data = self.handlers[param.name](data)
+                        value = self.handlers[param.name](value)
 
                     if (
                         warn_mismatched_type
@@ -136,18 +138,17 @@ class ConfigurableContextManager:
                     ):
                         import beartype.door  # type: ignore[import-not-found]
 
-                        if not beartype.door.is_bearable(data, param.annotation):
+                        if not beartype.door.is_bearable(value, param.annotation):
                             warnings.warn(
-                                f'Parameter `{param}` received non-matching value of type `{type(data)}`.',
+                                f'Parameter `{param}` received non-matching value of type `{type(value)}`.',
                                 stacklevel=2,
                             )
 
-                    config_kwargs[param.name] = data
+                    config_kwargs[param.name] = value
 
                 new_kwargs = config_kwargs | kwargs
                 out = fn(*args, **new_kwargs)
 
-            self.is_decorator = False
             return out
 
         return wrapper

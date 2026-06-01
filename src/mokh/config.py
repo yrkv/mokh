@@ -1,18 +1,12 @@
 import functools
-from typing import Any, Callable, NamedTuple, TypeAlias
+from typing import Any, Callable, TypeAlias
 
 from .common import is_dict_str_Any
-from .trie import TrieNode
+from .trie import _NO_VALUE, TrieNode
 
-# This way we can contain `None` without error...
-Value = NamedTuple('Value', [('data', Any)])
-"""
-Store a `Value` wrapper type in the `Config` values in order to distinguish
-between "there is no value" vs "the value is `None`".
-"""
-
-Config: TypeAlias = TrieNode[str, Value]
-"""Each `Config` is a mapping from string paths to `Value`s. Each path can be
+# Config: TypeAlias = TrieNode[str, Value]
+Config: TypeAlias = TrieNode
+"""Each `Config` is a mapping from string paths to values. Each path can be
 thought of as a sequence of dot-delimited string keys.
 
 We use a [trie](https://en.wikipedia.org/wiki/Trie) to represent the config so
@@ -40,48 +34,15 @@ def build_config(
         current_keys = (*keys, *key.split('.'))
 
         old_node = root.get(current_keys)
-        if old_node is not None and old_node.value is not None:
+        if old_node is not None and old_node.value is not _NO_VALUE:
             assert False, 'invalid overlap'
 
-        root[current_keys] = Value(val)
+        root[current_keys] = val
 
         if is_dict_str_Any(val):
             build_config(val, current_keys, root)
 
     return root
-
-
-def _merge_two(
-    a: Config,
-    b: Config,
-) -> Config:
-    out: Config = TrieNode()
-    out.value = b.value if b.value is not None else a.value
-
-    child_keys = {*a.children.keys(), *b.children.keys()}
-    for key in child_keys:
-        if key in a.children and key in b.children:
-            out.children[key] = merge_configs(a.children[key], b.children[key])
-        elif key in a.children:
-            out.children[key] = a.children[key]
-        elif key in b.children:
-            out.children[key] = b.children[key]
-
-    return out
-
-
-def merge_configs(
-    *configs: Config,
-) -> Config:
-    """Create a new `Config` by combining all the input configs, with later
-    values overriding earlier ones."""
-    assert len(configs) > 0
-
-    out = configs[0]
-    for config in configs[1:]:
-        out = _merge_two(out, config)
-
-    return out
 
 
 class ConfigSlot:
@@ -90,6 +51,30 @@ class ConfigSlot:
 
 
 CURRENT_CONFIG: ConfigSlot = ConfigSlot(TrieNode())
+
+
+class _RAISE_ERROR:
+    """Sentinel to raise an error instead of a default value."""
+
+
+def get(
+    *keys: str,
+    default: Any = _RAISE_ERROR,
+    current_config: ConfigSlot = CURRENT_CONFIG,
+) -> Any:
+    """
+    Retrieve the corresponding value for the key if found in
+    `mokh.config.CURRENT_CONFIG` via `CONFIG_CURSOR`.
+
+    Default behavior is to raise error if not found. Set `default` to any value
+    to make it the default.
+    """
+    out = current_config.slot[keys]
+    if out is not _NO_VALUE:
+        return out
+    if default is _RAISE_ERROR:
+        raise ValueError(f'{repr(keys)} not found in current config search index')
+    return default
 
 
 class ConfigureContextManager:

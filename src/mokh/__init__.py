@@ -4,9 +4,9 @@
 # """
 
 from . import common, config, dynamic, handler
+from .config import get
 from .configurable import configurable
 from .configure import configure, configure_cli, configure_file
-from .cursor import get
 
 __all__ = [
     # Functions
@@ -20,5 +20,4 @@ __all__ = [
     'dynamic',
     'handler',
     'common',
-    'cursor',
 ]

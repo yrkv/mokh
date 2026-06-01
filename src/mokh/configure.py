@@ -13,7 +13,6 @@ from .config import (
     Config,
     ConfigureContextManager,
     build_config,
-    merge_configs,
 )
 
 
@@ -72,7 +71,7 @@ def configure(
         source = kwargs
 
     config = build_config(source)
-    return ConfigureContextManager(lambda c: merge_configs(c, config))
+    return ConfigureContextManager(lambda c: c.merge(config))
 
 
 def _config_from_file(
@@ -157,7 +156,7 @@ def configure_file(
 
         return nullcontext()
 
-    return ConfigureContextManager(lambda c: merge_configs(c, config))
+    return ConfigureContextManager(lambda c: c.merge(config))
 
 
 def configure_cli(
@@ -234,9 +233,9 @@ def configure_cli(
 
     merged_config: Config = build_config({})
     for config in configs:
-        merged_config = merge_configs(merged_config, config)
+        merged_config = merged_config.merge(config)
 
-    return ConfigureContextManager(lambda c: merge_configs(c, merged_config))
+    return ConfigureContextManager(lambda c: c.merge(merged_config))
 
 
 class ConfigError(Exception):
