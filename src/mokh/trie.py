@@ -1,4 +1,3 @@
-import copy
 from collections.abc import Hashable, Iterable
 from typing import Any
 
@@ -74,7 +73,7 @@ class TrieNode:
         the other trie taking priority over values from self.
         """
         value = self.value
-        children = copy.copy(self.children)
+        children = self.children.copy()
 
         if other.value is not _NO_VALUE:
             value = other.value
