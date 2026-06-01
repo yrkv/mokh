@@ -8,6 +8,10 @@ class _NO_VALUE:
 
 
 class TrieNode:
+    """
+    Simple immutable [trie](https://en.wikipedia.org/wiki/Trie).
+    """
+
     value: Any | _NO_VALUE
     children: dict[Hashable, 'TrieNode']
 
@@ -28,6 +32,12 @@ class TrieNode:
 
     @classmethod
     def from_pairs(cls, pairs: Iterable[tuple[Iterable[Hashable], Any]]):
+        """
+        Construct a trie from an iterable to pairs containing a prefix of keys
+        and the corresponding value to assign there.
+
+        It is an error for two sequences of values to map to the same value.
+        """
         root = cls()
         for keys, value in pairs:
             root._set_value(keys, value)
@@ -59,6 +69,10 @@ class TrieNode:
         return out_node.value
 
     def merge(self, other: 'TrieNode') -> 'TrieNode':
+        """
+        Create a new trie by combining this trie with another, with values from
+        the other trie taking priority over values from self.
+        """
         value = self.value
         children = copy.copy(self.children)
 
