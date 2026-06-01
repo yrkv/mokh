@@ -54,7 +54,7 @@ class TrieNode:
             raise ImmutableError(f'Value for {keys!r} is already set')
         object.__setattr__(current, 'value', value)
 
-    def get(self, keys: Iterable[Hashable], /) -> 'TrieNode' | None:
+    def get_node(self, keys: Iterable[Hashable], /) -> 'TrieNode' | None:
         current = self
         for key in keys:
             if key not in current.children:
@@ -63,7 +63,7 @@ class TrieNode:
         return current
 
     def __getitem__(self, keys: Iterable[Hashable], /) -> Any | _NO_VALUE:
-        out_node = self.get(keys)
+        out_node = self.get_node(keys)
         if out_node is None:
             return _NO_VALUE
         return out_node.value
