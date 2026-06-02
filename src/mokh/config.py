@@ -1,25 +1,23 @@
-import functools
-from collections.abc import Generator
-from typing import Any, Callable, TypeAlias
-
-from .common import is_dict_str_Any
-from .trie import _NO_VALUE, TrieNode
-
-# Config: TypeAlias = TrieNode[str, Value]
-Config: TypeAlias = TrieNode
-"""Each `Config` is a mapping from string paths to values. Each path can be
+"""Each config is a mapping from string paths to values. Each path can be
 thought of as a sequence of dot-delimited string keys.
 
 We use a [trie](https://en.wikipedia.org/wiki/Trie) to represent the config so
 we can retrieve subsets based on a prefix.
 """
 
+import functools
+from collections.abc import Generator
+from typing import Any, Callable
+
+from .common import is_dict_str_Any
+from .trie import _NO_VALUE, TrieNode
+
 
 def flatten_config_source(
     source: dict[str, Any],
 ) -> Generator[tuple[list[str], Any]]:
     for key, val in source.items():
-        # it's not really clear how we might handle keys with dots at start/end
+        # it's not clear how to handle keys with dots at start/end
         assert not key.startswith('.') and not key.endswith('.')
         keys = key.split('.')
 
@@ -32,8 +30,8 @@ def flatten_config_source(
 
 def build_config(
     source: dict[str, Any],
-) -> Config:
-    """Create a `Config` trie from a (potentially nested) dict source.
+) -> TrieNode:
+    """Create a config trie from a (potentially nested) dict source.
 
     This does NOT deep copy values from the source dict, so the source should
     be considered "used up" afterwards.
@@ -42,11 +40,27 @@ def build_config(
 
 
 class ConfigSlot:
-    def __init__(self, config: Config):
+    """
+    Container for a single config trie.
+
+    The only real reason this exists is to introduce an additional layer so
+    that we can replace the contained trie in a global config variable.
+
+    See `CURRENT_CONFIG`.
+    """
+
+    def __init__(self, config: TrieNode):
         self.slot = config
 
 
 CURRENT_CONFIG: ConfigSlot = ConfigSlot(TrieNode())
+"""
+Global variable used (by default) as the location where the current config
+lives.
+
+All functions which use it should have it as a default value for a parameter,
+in order to support multiple simultaneous configs.
+"""
 
 
 class _RAISE_ERROR:
@@ -59,8 +73,9 @@ def get(
     current_config: ConfigSlot = CURRENT_CONFIG,
 ) -> Any:
     """
-    Retrieve the corresponding value for the key if found in
-    `mokh.config.CURRENT_CONFIG` via `CONFIG_CURSOR`.
+    Retrieve the corresponding value for the key if found in the current
+    config. This is essentially just a convenient wrapper around the internal
+    trie.
 
     Default behavior is to raise error if not found. Set `default` to any value
     to make it the default.
@@ -77,21 +92,25 @@ class ConfigureContextManager:
     """Context manager which applies changes to the current config, as well as
     reverting said changes upon end.
 
-    Since `Config` is immutable after creation from our perspective, this
-    changes the `CURRENT_CONFIG` variable, not the actual `Config` objects.
+    Since config tries are immutable after creation, this modifies
+    `CURRENT_CONFIG` (by default), not the actual trie objects.
 
-    TODO explain args
+    Accepts a single function which will be provided the current config trie
+    and expected to produce the next config trie to replace the current one.
+
+    It can also be used as a decorator, which is equivalent to applying as a
+    context manager at the start every time the function is called.
     """
 
     def __init__(
         self,
-        f: Callable[[Config], Config],
+        f: Callable[[TrieNode], TrieNode],
         *,
         current_config: ConfigSlot = CURRENT_CONFIG,
     ):
         self.f = f
         self.current_config = current_config
-        self.history: list[Config] = []
+        self.history: list[TrieNode] = []
 
     def __enter__(self):
         self.history.append(self.current_config.slot)

@@ -20,4 +20,5 @@ __all__ = [
     'dynamic',
     'handler',
     'common',
+    'trie',
 ]

@@ -9,11 +9,8 @@ from typing import Any
 import yaml
 
 from .common import is_dict_str_Any
-from .config import (
-    Config,
-    ConfigureContextManager,
-    build_config,
-)
+from .config import ConfigureContextManager, build_config
+from .trie import TrieNode
 
 
 def configure(
@@ -23,7 +20,7 @@ def configure(
 ) -> AbstractContextManager:
     """Apply configuration values within some context.
 
-    This interprets the args as a `mokh.config.Config` and updates
+    This interprets the args as a config source and updates
     `mokh.config.CURRENT_CONFIG` with it.
 
     Basic usage is to set config value(s) within a context. Then, those values
@@ -76,7 +73,7 @@ def configure(
 
 def _config_from_file(
     p: Path,
-) -> Config:
+) -> TrieNode:
     if not p.exists():
         raise ErrMissing(f"No such file: '{p}'")
     if not p.is_file():
@@ -231,7 +228,7 @@ def configure_cli(
         p = Path(c)
         configs.append(_config_from_file(p))
 
-    merged_config: Config = build_config({})
+    merged_config = TrieNode()
     for config in configs:
         merged_config = merged_config.merge(config)
 

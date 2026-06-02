@@ -10,7 +10,7 @@ class TrieNode:
     """
     Simple immutable [trie](https://en.wikipedia.org/wiki/Trie).
 
-    Note: not *truly* immutable, only intended to be treated as immutable.
+    Note: not *truly* immutable, but expected to be treated as immutable.
     Python follows a "consenting adults" philosophy, allowing bypass of
     conventions and access to internals when necessary.
     """
@@ -60,7 +60,7 @@ class TrieNode:
             raise ImmutableError(f'Value for {keys!r} is already set')
         object.__setattr__(current, 'value', value)
 
-    def get_node(self, keys: Iterable[Hashable], /) -> 'TrieNode' | None:
+    def get_node(self, keys: Iterable[Hashable], /) -> 'TrieNode | None':
         current = self
         for key in keys:
             if key not in current._children:
