@@ -113,11 +113,12 @@ class TrieNode:
         return out
 
     def __repr__(self) -> str:
-        value_str = () if self.value is _NO_VALUE else (f'value={self.value}',)
-        children_str = (
-            () if self._children == {} else (f'children={self._children}',)
-        )
-        return f'TrieNode({", ".join([*value_str, *children_str])})'
+        parts = []
+        if self.value is not _NO_VALUE:
+            parts.append(f'value={self.value!r}')
+        if self._children:
+            parts.append(f'children={self._children!r}')
+        return f'TrieNode({", ".join(parts)})'
 
 
 class ImmutableError(Exception):
