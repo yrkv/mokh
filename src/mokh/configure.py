@@ -2,7 +2,6 @@ import argparse
 import json
 import re
 import warnings
-from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +16,7 @@ def configure(
     source: dict[str, Any] = {},
     /,
     **kwargs: Any,
-) -> AbstractContextManager:
+) -> ConfigureContextManager:
     """Apply configuration values within some context.
 
     This interprets the args as a config source and updates
@@ -116,7 +115,7 @@ def configure_file(
     on_unsupported: str = 'error',
     on_invalid_data: str = 'error',
     on_any_error: str | None = None,
-) -> AbstractContextManager:
+) -> ConfigureContextManager:
     """Variant of `configure` which reads a file for the config.
 
     `configure_file` allows defining handling of each possible error:
@@ -151,7 +150,7 @@ def configure_file(
                     f"Invalid mode '{mode}'. Expected one of 'error', 'warn', 'ignore'"
                 )
 
-        return nullcontext()
+        return ConfigureContextManager(lambda c: c)
 
     return ConfigureContextManager(lambda c: c.merge(config))
 
@@ -159,7 +158,7 @@ def configure_file(
 def configure_cli(
     short: str | None = '-c',
     long: str | None = '--config',
-) -> AbstractContextManager:
+) -> ConfigureContextManager:
     """Variant of `configure` which gathers config values using arguments.
 
     Using `argparse`, it registers `-c` and `--config` to set configuration
@@ -202,9 +201,6 @@ def configure_cli(
     # )
 
     args, _ = parser.parse_known_args()
-
-    if args.config is None:
-        return nullcontext()
 
     configs = []
     for c in args.config:
