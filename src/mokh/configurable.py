@@ -2,6 +2,7 @@ import functools
 import inspect
 import warnings
 from importlib.util import find_spec
+from pathlib import Path
 from types import FunctionType
 from typing import Any, Callable
 
@@ -39,6 +40,13 @@ def configurable(
     )
 
 
+def _descend(config: TrieNode, key: str) -> TrieNode:
+    sub_config = config.get_node([key])
+    if sub_config is None:
+        return config
+    return config.merge(sub_config)
+
+
 class ConfigurableContextManager:
     def __init__(
         self,
@@ -50,11 +58,16 @@ class ConfigurableContextManager:
         self.handlers = handlers
         self.current_config = current_config
 
+        self.filestem = None
+
         def configure_fn(config: TrieNode) -> TrieNode:
-            sub_config = config.get_node([self.key])
-            if sub_config is None:
-                return config
-            return config.merge(sub_config)
+            if self.key is None:
+                raise ValueError('key is required')
+
+            if self.filestem is not None:
+                config = _descend(config, self.filestem)
+            config = _descend(config, self.key)
+            return config
 
         self.configure_cm = ConfigureContextManager(
             configure_fn, current_config=self.current_config
@@ -62,7 +75,6 @@ class ConfigurableContextManager:
 
     def __enter__(self):
         """@public"""
-        assert self.key is not None, 'key required'
         self.configure_cm.__enter__()
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
@@ -88,6 +100,16 @@ class ConfigurableContextManager:
             - See examples and test cases in `tests/configurable.py`.
         3. Default values in the function definition.
         """
+
+        configurable_auto_filestem = mokh_get(
+            'mokh',
+            'configurable_auto_filestem',
+            default=True,
+            current_config=self.current_config,
+        )
+
+        if configurable_auto_filestem:
+            self.filestem = Path(inspect.getfile(fn)).stem
 
         if self.key is None:
             self.key = _generate_key(fn)
