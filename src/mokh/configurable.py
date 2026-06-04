@@ -101,22 +101,24 @@ class ConfigurableContextManager:
         3. Default values in the function definition.
         """
 
-        configurable_auto_filestem = mokh_get(
-            'mokh',
-            'configurable_auto_filestem',
-            default=True,
-            current_config=self.current_config,
-        )
-
-        if configurable_auto_filestem:
-            self.filestem = Path(inspect.getfile(fn)).stem
-
         if self.key is None:
             self.key = _generate_key(fn)
         sig = inspect.signature(fn)
 
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
+
+            configurable_auto_filestem = mokh_get(
+                'mokh',
+                'configurable_auto_filestem',
+                default=True,
+                current_config=self.current_config,
+            )
+
+            if configurable_auto_filestem:
+                self.filestem = Path(inspect.getfile(fn)).stem
+            else:
+                self.filestem = None
 
             with self:
                 warn_configured_non_kwonly = mokh_get(
