@@ -202,6 +202,9 @@ def configure_cli(
 
     args, _ = parser.parse_known_args()
 
+    if args.config is None:
+        return ConfigureContextManager(lambda c: c)
+
     configs = []
     for c in args.config:
         # first case is a JSON object string
