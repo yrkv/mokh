@@ -112,7 +112,7 @@ class ConfigurableContextManager:
             configurable_auto_filestem = mokh_get(
                 'mokh',
                 'configurable_auto_filestem',
-                default=True,
+                default=False,
                 current_config=self.current_config,
             )
 
