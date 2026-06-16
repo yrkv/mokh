@@ -1,12 +1,13 @@
 import functools
 import inspect
 import warnings
+from contextvars import ContextVar
 from importlib.util import find_spec
 from pathlib import Path
 from types import FunctionType
 from typing import Any, Callable
 
-from .config import CURRENT_CONFIG, ConfigSlot, ConfigureContextManager
+from .config import CURRENT_CONFIG, ConfigureContextManager
 from .config import get as mokh_get
 from .trie import _NO_VALUE, TrieNode
 
@@ -52,7 +53,7 @@ class ConfigurableContextManager:
         self,
         key: str | None = None,
         handlers: dict[str, Callable[[Any], Any]] = {},
-        current_config: ConfigSlot = CURRENT_CONFIG,
+        current_config: ContextVar[TrieNode] = CURRENT_CONFIG,
     ):
         self.key = key
         self.handlers = handlers
@@ -139,7 +140,7 @@ class ConfigurableContextManager:
                     if param.kind is not inspect.Parameter.KEYWORD_ONLY:
                         if (
                             warn_configured_non_kwonly
-                            and self.current_config.slot[[param.name]]
+                            and self.current_config.get()[[param.name]]
                             is not _NO_VALUE
                         ):
                             warnings.warn(
@@ -149,7 +150,7 @@ class ConfigurableContextManager:
                     if param.name in kwargs:
                         continue
 
-                    value = self.current_config.slot[[param.name]]
+                    value = self.current_config.get()[[param.name]]
                     if value is _NO_VALUE:
                         continue
 

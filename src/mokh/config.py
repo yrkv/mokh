@@ -7,6 +7,7 @@ we can retrieve subsets based on a prefix.
 
 import functools
 from collections.abc import Generator
+from contextvars import ContextVar
 from typing import Any, Callable
 
 from .common import is_dict_str_Any
@@ -39,21 +40,7 @@ def build_config(
     return TrieNode.from_pairs(flatten_config_source(source))
 
 
-class ConfigSlot:
-    """
-    Container for a single config trie.
-
-    The only real reason this exists is to introduce an additional layer so
-    that we can replace the contained trie in a global config variable.
-
-    See `CURRENT_CONFIG`.
-    """
-
-    def __init__(self, config: TrieNode):
-        self.slot = config
-
-
-CURRENT_CONFIG: ConfigSlot = ConfigSlot(TrieNode())
+CURRENT_CONFIG: ContextVar[TrieNode] = ContextVar('mokh_config', default=TrieNode())
 """
 Global variable used (by default) as the location where the current config
 lives.
@@ -70,7 +57,7 @@ class _RAISE_ERROR:
 def get(
     *keys: str,
     default: Any = _RAISE_ERROR,
-    current_config: ConfigSlot = CURRENT_CONFIG,
+    current_config: ContextVar[TrieNode] = CURRENT_CONFIG,
 ) -> Any:
     """
     Retrieve the corresponding value for the key if found in the current
@@ -80,7 +67,7 @@ def get(
     Default behavior is to raise error if not found. Set `default` to any value
     to make it the default.
     """
-    out = current_config.slot[keys]
+    out = current_config.get()[keys]
     if out is not _NO_VALUE:
         return out
     if default is _RAISE_ERROR:
@@ -106,18 +93,19 @@ class ConfigureContextManager:
         self,
         f: Callable[[TrieNode], TrieNode],
         *,
-        current_config: ConfigSlot = CURRENT_CONFIG,
+        current_config: ContextVar[TrieNode] = CURRENT_CONFIG,
     ):
         self.f = f
         self.current_config = current_config
-        self.history: list[TrieNode] = []
+        self.history: list = []
 
     def __enter__(self):
-        self.history.append(self.current_config.slot)
-        self.current_config.slot = self.f(self.current_config.slot)
+        c = self.current_config.get()
+        token = self.current_config.set(self.f(c))
+        self.history.append(token)
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
-        self.current_config.slot = self.history.pop()
+        self.current_config.reset(self.history.pop())
 
     def __call__(self, fn):
         @functools.wraps(fn)
