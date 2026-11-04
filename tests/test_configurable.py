@@ -42,7 +42,7 @@ def test_default_prefixes():
 
 
 def test_overlap():
-    with pytest.raises(Exception):
+    with pytest.raises(mokh.trie.ImmutableError):
         mokh.configure(
             {
                 'a.b': 10,
@@ -67,7 +67,7 @@ def test_more():
     with c:
         assert mokh.get('a') == 10
         with asdf:
-            mokh.get('a') == 10
+            assert mokh.get('a') == 10
 
         with foo, bar:
             assert mokh.get('a') == 20
