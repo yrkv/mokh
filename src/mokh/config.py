@@ -127,3 +127,22 @@ class ConfigureContextManager:
                 return fn(*args, **kwargs)
 
         return wrapper
+
+
+class _Getter:
+    def __getattr__(self, name: str) -> Any:
+        return get(name)
+
+
+MOKH_GET = _Getter()
+"""
+Convenience singleton which aliases `getattr` to `mokh.get`, which enables:
+
+```python
+import mokh
+import mokh.config.MOKH_GET as M
+
+with mokh.configure(x=123):
+    print(M.x) # prints 123
+```
+"""
