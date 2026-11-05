@@ -1,11 +1,12 @@
 import functools
 import inspect
 import warnings
+from collections.abc import Callable
 from contextvars import ContextVar
 from importlib.util import find_spec
 from pathlib import Path
 from types import FunctionType
-from typing import Any, Callable
+from typing import Any
 
 from .config import CURRENT_CONFIG, ConfigureContextManager
 from .config import get as mokh_get
@@ -18,7 +19,7 @@ def configurable(
     key: str | None = None,
     /,
     *,
-    handlers: dict[str, Callable[[Any], Any]] = {},
+    handlers: dict[str, Callable[[Any], Any]] | None = None,
 ):
     """
     Context manager and function decorator which defines how the config is
@@ -52,9 +53,11 @@ class ConfigurableContextManager:
     def __init__(
         self,
         key: str | None = None,
-        handlers: dict[str, Callable[[Any], Any]] = {},
+        handlers: dict[str, Callable[[Any], Any]] | None = None,
         current_config: ContextVar[TrieNode] = CURRENT_CONFIG,
     ):
+        if handlers is None:
+            handlers = {}
         self.key = key
         self.handlers = handlers
         self.current_config = current_config

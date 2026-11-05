@@ -8,6 +8,7 @@ from .config import get
 from .configurable import configurable
 from .configure import configure, configure_cli, configure_file
 
+# ruff: noqa: RUF022
 __all__ = [
     # Functions
     'configurable',

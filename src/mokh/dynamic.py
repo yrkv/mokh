@@ -154,7 +154,7 @@ def _find_rec(
 
     if hasattr(context, name):
         next_context = getattr(context, name)
-    elif is_dict_str_Any(context) and name in context.keys():
+    elif is_dict_str_Any(context) and name in context:
         next_context = context[name]
     else:
         raise LookupError(f"Unable to find '{name}'")

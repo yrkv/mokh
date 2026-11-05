@@ -13,7 +13,7 @@ from .trie import TrieNode
 
 
 def configure(
-    source: dict[str, Any] = {},
+    source: dict[str, Any] | None = None,
     /,
     **kwargs: Any,
 ) -> ConfigureContextManager:
@@ -58,12 +58,12 @@ def configure(
     ```
     """
 
-    if len(source) > 0 and len(kwargs) > 0:
+    if source is not None and len(kwargs) > 0:
         raise ValueError(
             'Provide either a single positional arg or keyword arguments, not both'
         )
 
-    if source == {}:
+    if source is None:
         source = kwargs
 
     config = build_config(source)

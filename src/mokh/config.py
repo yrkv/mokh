@@ -6,9 +6,9 @@ we can retrieve subsets based on a prefix.
 """
 
 import functools
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextvars import ContextVar
-from typing import Any, Callable
+from typing import Any
 
 from .common import is_dict_str_Any
 from .trie import _NO_VALUE, TrieNode
@@ -40,7 +40,10 @@ def build_config(
     return TrieNode.from_pairs(flatten_config_source(source))
 
 
-CURRENT_CONFIG: ContextVar[TrieNode] = ContextVar('mokh_config', default=TrieNode())
+CURRENT_CONFIG: ContextVar[TrieNode] = ContextVar(
+    'mokh_config',
+    default=TrieNode(),  # noqa: B039 - TrieNode is immutable
+)
 """
 Global variable used (by default) as the location where the current config
 lives.
@@ -71,7 +74,7 @@ def get(
     if out is not _NO_VALUE:
         return out
     if default is _RAISE_ERROR:
-        raise ValueError(f'{repr(keys)} not found in current config search index')
+        raise ValueError(f'{keys!r} not found in current config search index')
     return default
 
 

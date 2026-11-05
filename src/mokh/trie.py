@@ -103,7 +103,7 @@ class TrieNode:
         for i, (key, val) in enumerate(self._children.items()):
             indent_str = indent_more if i < count - 1 else indent_last
             out_value = '' if val.value is _NO_VALUE else f' value={val.value}'
-            out += f'{indent}{repr(key)}{out_value}\n'
+            out += f'{indent}{key!r}{out_value}\n'
 
             out += val._str_helper(
                 indent=f'{indent}{indent_str}',
