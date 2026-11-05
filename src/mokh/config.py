@@ -102,6 +102,16 @@ class ConfigureContextManager:
         self.current_config = current_config
         self.history: list = []
 
+    def chain(self, other: 'ConfigureContextManager'):
+        """Create a new context manager that applies self and other in order."""
+        if self.current_config is not other.current_config:
+            raise ValueError()
+
+        return ConfigureContextManager(
+            lambda c: other.f(self.f(c)),
+            current_config=self.current_config,
+        )
+
     def __enter__(self):
         c = self.current_config.get()
         token = self.current_config.set(self.f(c))
