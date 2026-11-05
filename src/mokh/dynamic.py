@@ -191,4 +191,4 @@ def _apply_partial(
         assert isinstance(star_args, Sequence)
         return functools.partial(fn, *star_args, **keyword_args)
     else:
-        raise ValueError()
+        raise TypeError()

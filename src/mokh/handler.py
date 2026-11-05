@@ -44,6 +44,6 @@ def for_each(
         elif isinstance(value, dict):
             return {key: h(val) for key, val in value.items()}
         else:
-            raise ValueError()
+            raise TypeError()
 
     return out
